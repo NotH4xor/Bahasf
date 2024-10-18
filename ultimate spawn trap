@@ -1,0 +1,51 @@
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local LPlayer = Players.LocalPlayer
+
+
+local Remotes = ReplicatedStorage.Remotes
+local StampAsset = Remotes.StampAsset
+local Plates = Workspace.Plates
+local LPlate
+
+for _, Plate in pairs(Plates:GetChildren()) do
+    if (Plate.Owner.Value == LPlayer) then
+        LPlate = Plate.Plate
+        break
+    end
+end
+
+local Module = {}
+
+function Module.Kill(Player)
+    if (Player:IsA("Player")) then Player = Player.Character.PrimaryPart end
+    StampAsset:InvokeServer(
+        41324885,
+        LPlate.CFrame - Vector3.new(0, 9e9, 0),
+        "{99ab22df-ca29-4143-a2fd-0a1b79db78c2}",
+        {Player},
+        0
+    )
+end
+
+-- Hàm kiểm tra người chơi có phải là bạn bè của bạn hay không
+local function isFriend(player)
+    return LPlayer:IsFriendsWith(player.UserId)
+end
+
+-- Vòng lặp liên tục để kill người chơi không phải là bạn bè
+while true do
+    -- Target tất cả người chơi không phải là bạn bè
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LPlayer and not isFriend(player) then
+            if player.Character and player.Character.PrimaryPart then
+                Module.Kill(player.Character.PrimaryPart)
+            end
+        end
+    end
+    
+    -- Delay 0.01 giây trước khi lặp lại
+    wait(0.01)
+end
