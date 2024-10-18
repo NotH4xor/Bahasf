@@ -1,0 +1,46 @@
+-- Get required services
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local GuiService = game:GetService("GuiService")
+
+local PlaceId = game.PlaceId
+local JobId = game.JobId
+
+-- Function to handle rejoining
+local function rejoin()
+    if #Players:GetPlayers() <= 1 then
+        Players.LocalPlayer:Kick("\nRejoining...")
+        wait(0.5)
+        TeleportService:Teleport(PlaceId, Players.LocalPlayer)
+    else
+        TeleportService:TeleportToPlaceInstance(PlaceId, JobId, Players.LocalPlayer)
+    end
+end
+
+-- Command to rejoin the game
+_G.rejoinCommand = function()
+    rejoin()
+end
+
+-- Function to auto rejoin on error
+local function enableAutoRejoin()
+    GuiService.ErrorMessageChanged:Connect(function()
+        if GuiService:GetErrorMessage() ~= "" then
+            rejoin()
+        end
+    end)
+end
+
+-- Enable auto rejoin by default
+enableAutoRejoin()
+
+-- Auto execute script compatibility
+if _G.autoExecuteEnabled == nil then
+    _G.autoExecuteEnabled = true
+    enableAutoRejoin()
+end
+
+-- Notification for successful script loading
+if typeof(notify) == "function" then
+    notify("Script Loaded", "Auto rejoin enabled.")
+end
