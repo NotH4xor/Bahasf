@@ -1,0 +1,67 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local LPlayer = Players.LocalPlayer
+
+local Remotes = ReplicatedStorage.Remotes
+local StampAsset = Remotes.StampAsset
+local Plates = Workspace.Plates
+local LPlate
+
+-- cache LPlate once
+for i = 1, #Plates:GetChildren() do
+local Plate = Plates:GetChildren()[i]
+if Plate.Owner.Value == LPlayer then
+LPlate = Plate.Plate
+break
+end
+end
+
+local Module = {}
+
+function Module.Kill(primaryPart)
+if primaryPart then
+StampAsset:InvokeServer(
+41324885,
+LPlate.CFrame - Vector3.new(0, 9e9, 0),
+"{}",
+{primaryPart},
+0
+)
+end
+end
+
+local function isFriend(player)
+return LPlayer:IsFriendsWith(player.UserId)
+end
+
+-- function to handle aggressive monitoring of players
+local function monitorPlayer(player)
+if player ~= LPlayer and not isFriend(player) then
+player.CharacterAdded:Connect(function(character)
+character:WaitForChild("HumanoidRootPart", 2)
+Module.Kill(character.PrimaryPart)
+end)
+end
+end
+
+-- connect function to PlayerAdded event for aggressive monitoring
+Players.PlayerAdded:Connect(monitorPlayer)
+for _, player in ipairs(Players:GetPlayers()) do
+monitorPlayer(player)
+end
+
+-- rapid execution loop
+task.spawn(function()
+while true do
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= LPlayer and not isFriend(player) then
+local character = player.Character
+if character and character.PrimaryPart then
+Module.Kill(character.PrimaryPart)
+end
+end
+end
+task.wait(0.05) -- short delay for rapid execution
+end
+end)
