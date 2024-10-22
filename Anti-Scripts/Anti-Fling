@@ -1,0 +1,22 @@
+local Vector3_new, pcall = Vector3.new, pcall
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+RunService.Stepped:Connect(function()
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= Players.LocalPlayer and player.Character then
+pcall(function()
+for _, part in ipairs(player.Character:GetChildren()) do
+if part:IsA("BasePart") and part.CanCollide then
+part.CanCollide = false
+if part.Name == "Torso" or part.Name == "HumanoidRootPart" then
+part.Massless = true
+end
+part.Velocity = Vector3_new(0, 0, 0)
+part.RotVelocity = Vector3_new(0, 0, 0)
+end
+end
+end)
+end
+end
+end)
