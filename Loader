@@ -5,7 +5,6 @@ local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Spawn%20Trap/Final%20Spawntrap',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20Rejoin/anti-kick',
-    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20Rejoin/ServerhopKeyP',
 }
 
 for _, url in ipairs(scripts) do
