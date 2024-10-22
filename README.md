@@ -1,6 +1,6 @@
 # Script
 ```
-loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Loader'))()
 ```
 # Original found from:
 https://scriptblox.com/u/linhmcfake2
