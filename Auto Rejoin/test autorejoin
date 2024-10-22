@@ -1,15 +1,63 @@
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
 local PlaceId = game.PlaceId
 local JobId = game.JobId
 
+local order = "Desc"  -- Use "Desc" for maximum players, "Asc" for minimum players
+
+local function serverHop()
+    local Servers = {}
+    local url = string.format(
+        "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
+        PlaceId,
+        order
+    )
+    local starting = tick()
+    local Server = nil
+
+    repeat
+        local success, result = pcall(function()
+            return HttpService:GetAsync(url)
+        end)
+        if not success then
+            wait(2)
+            continue
+        end
+        local decoded = HttpService:JSONDecode(result)
+        if #decoded.data ~= 0 then
+            Servers = decoded.data
+            for _, v in ipairs(Servers) do
+                if v.maxPlayers and v.playing and v.maxPlayers > v.playing and v.id ~= JobId then
+                    Server = v
+                    break
+                end
+            end
+            if Server then
+                break
+            end
+        end
+        url = string.format(
+            "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s",
+            PlaceId,
+            order,
+            decoded.nextPageCursor or ""
+        )
+    until tick() - starting >= 600
+
+    if Server then
+        TeleportService:TeleportToPlaceInstance(PlaceId, Server.id, Players.LocalPlayer)
+    end
+end
+
 local function rejoin()
     if #Players:GetPlayers() <= 1 then
-        Players.LocalPlayer:Kick("\nRejoining...")
+        Players.LocalPlayer:Kick("
+Rejoining...")
         wait(0.5)
-        TeleportService:Teleport(PlaceId, Players.LocalPlayer)
+        serverHop()
     else
         TeleportService:TeleportToPlaceInstance(PlaceId, JobId, Players.LocalPlayer)
     end
