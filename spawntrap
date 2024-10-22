@@ -1,0 +1,71 @@
+--[[
+v1.0   
++ Added one time run check
++ Added optimization
++ Shortened code
+]]
+
+if _G.ScriptAlreadyRan then
+    print("Script already ran, exiting...")
+    return
+end
+_G.ScriptAlreadyRan = true
+
+print("Script is running for the first time...")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LPlayer, Plates, StampAsset = Players.LocalPlayer, Workspace.Plates, ReplicatedStorage.Remotes.StampAsset
+
+local LPlate = nil
+for _, plate in ipairs(Plates:GetChildren()) do
+    if plate.Owner.Value == LPlayer then
+        LPlate = plate.Plate
+        break
+    end
+end
+
+local Module = {}
+
+function Module.Kill(Player)
+    local target = Player:IsA("Player") and Player.Character and Player.Character.PrimaryPart or Player
+    if target then
+        StampAsset:InvokeServer(41324885, LPlate.CFrame - Vector3.new(0, 9e9, 0), "{}", { target }, 0)
+    end
+end
+
+local function isFriend(player)
+    return LPlayer:IsFriendsWith(player.UserId)
+end
+
+local function monitorPlayer(player)
+    if player ~= LPlayer and not isFriend(player) then
+        player.CharacterAdded:Connect(function(character)
+            character:WaitForChild("HumanoidRootPart")
+            Module.Kill(character.PrimaryPart)
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(monitorPlayer)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    monitorPlayer(player)
+end
+
+task.spawn(function()
+    while true do
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LPlayer and not isFriend(player) then
+                local character = player.Character
+                if character and character.PrimaryPart then
+                    Module.Kill(character.PrimaryPart)
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+print("Script execution complete.")
