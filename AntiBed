@@ -1,0 +1,42 @@
+-- Get the RunService
+local RunService = game:GetService("RunService")
+
+-- Get the LocalBin object
+local LocalBin = workspace.LocalBin
+
+-- Define a table to store the names of the objects
+local objectNames = {"Bed", "Toilet", "Dining Chair", "Captain's Chair", "Chair - Tall", "Chair - Short", "Throne - Blue", "Medieval Desk Chair - Blue", "Couch"}
+
+-- Define a function to delete the objects
+local function deleteObjects()
+   -- Check if the LocalBin object exists
+   if LocalBin then
+      -- Loop through the object names
+      for _, objectName in pairs(objectNames) do
+         -- Use the FindFirstChild method to get the object
+         local object = LocalBin:FindFirstChild(objectName)
+         -- Check if the object exists
+         if object then
+            -- Delete the object
+            object:Destroy()
+            -- Print a message to the output
+            print(object.Name .. " deleted")
+         else
+            -- Print a message to the output
+            print(objectName .. " not found")
+         end
+      end
+   else
+      -- Print a message to the output
+      print("LocalBin not found")
+   end
+end
+
+-- Define a function to handle the loop logic
+local function onStep()
+   -- Call the deleteObjects function
+   deleteObjects()
+end
+
+-- Connect the onStep function to the RunService's Stepped event
+RunService.Stepped:Connect(onStep)
