@@ -1,0 +1,18 @@
+local player = game:GetService("Players").LocalPlayer
+
+game:GetService("RunService").RenderStepped:Connect(function()
+local tool = player.Character and player.Character:FindFirstChildWhichIsA("Tool")
+if tool and tool:FindFirstChild("Handle") then
+for _, target in ipairs(game:GetService("Players"):GetPlayers()) do
+local char = target.Character
+if target ~= player and char and char:FindFirstChildWhichIsA("Humanoid") then
+for _, part in ipairs(char:GetChildren()) do
+if part:IsA("BasePart") then
+pcall(firetouchinterest, tool.Handle, part, 1)
+pcall(firetouchinterest, tool.Handle, part, 0)
+end
+end
+end
+end
+end
+end)
