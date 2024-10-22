@@ -1,3 +1,5 @@
+-- Original Auto Rejoin Script
+
 -- Get required services
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
