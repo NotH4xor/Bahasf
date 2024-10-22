@@ -2,8 +2,8 @@
 + Added Test Autojoin Script
 ]]
 local scripts = {
-    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Spawn%20Trap/Final%20Spawntrap',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/spawntrap',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/antikick',
 }
 
