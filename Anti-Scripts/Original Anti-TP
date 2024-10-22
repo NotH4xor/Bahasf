@@ -1,0 +1,37 @@
+-- Anti-Teleport Script for Local Player
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LPlayer = Players.LocalPlayer
+
+-- Function to protect from teleportation via StampAsset
+local function blockRemoteCalls()
+local meta = getrawmetatable(game)
+local originalIndex = meta.__index
+local originalNameCall = meta.__namecall
+setreadonly(meta, false)
+
+meta.__index = newcclosure(function(self, key)
+if tostring(self) == "StampAsset" and tostring(key) == "InvokeServer" then
+return function() return end  -- Block the invocation
+end
+return originalIndex(self, key)
+end)
+
+meta.__namecall = newcclosure(function(self, ...)
+local method = getnamecallmethod()
+if tostring(self) == "StampAsset" and method == "InvokeServer" then
+return -- Block the invocation
+end
+return originalNameCall(self, ...)
+end)
+
+setreadonly(meta, true)
+end
+
+-- Connect protection to character spawn
+LPlayer.CharacterAdded:Connect(blockRemoteCalls)
+
+-- Initial run if character already exists
+if LPlayer.Character then
+blockRemoteCalls()
+end
