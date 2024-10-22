@@ -1,0 +1,52 @@
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local order = "Desc"
+
+local function ServerHop()
+    local url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100", game.PlaceId, order)
+    local Server = nil
+
+    repeat
+        local success, result = pcall(function() return game:HttpGet(url) end)
+        if success then
+            local servers = HttpService:JSONDecode(result).data
+            for _, v in ipairs(servers) do
+                if v.maxPlayers > v.playing and v.id ~= game.JobId then
+                    Server = v
+                    break
+                end
+            end
+            if Server then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id)
+                return
+            end
+            if servers.nextPageCursor then
+                url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s", game.PlaceId, order, servers.nextPageCursor)
+            else
+                break
+            end
+        end
+        wait(2)
+    until false
+end
+
+local function IsFriendInServer()
+    local friends = Players:GetFriendsAsync(LocalPlayer.UserId):GetCurrentPage()
+    for _, player in ipairs(Players:GetPlayers()) do
+        for _, friend in ipairs(friends) do
+            if player.UserId == friend.Id then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+while true do
+    if #Players:GetPlayers() == 1 or IsFriendInServer() then
+        ServerHop()
+    end
+    wait(1)
+end
