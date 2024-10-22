@@ -6,7 +6,10 @@ loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/
 ```
 loadstring(game:HttpGet("https://raw.githubusercontent.com/fatesc/fates-admin/main/main.lua"))();
 ```
-
+# INF YIELD
+```
+loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+```
 # Original found from:
 https://scriptblox.com/u/linhmcfake2
 
