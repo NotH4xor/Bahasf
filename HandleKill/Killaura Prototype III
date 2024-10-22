@@ -1,0 +1,20 @@
+local Players = game:GetService("Players")
+local firetouchinterest = firetouchinterest
+
+local function killAll()
+local player, tool, handle = Players.LocalPlayer, Players.LocalPlayer.Character:FindFirstChildWhichIsA("Tool"), Players.LocalPlayer.Character:FindFirstChildWhichIsA("Tool"):FindFirstChild("Handle")
+if not firetouchinterest or not tool or not handle then return end
+
+for _, target in ipairs(Players:GetPlayers()) do
+local char, hum = target.Character, target.Character and target.Character:FindFirstChildWhichIsA("Humanoid")
+if target ~= player and char and hum and hum.Health > 0 then
+for _, part in ipairs(char:GetChildren()) do
+if part:IsA("BasePart") then
+for _ = 1, 10 do pcall(firetouchinterest, handle, part, 1) pcall(firetouchinterest, handle, part, 0) end
+end
+end
+end
+end
+end
+
+killAll()
