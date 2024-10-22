@@ -1,0 +1,16 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Plates = workspace:FindFirstChild("Plates")
+
+for _, Plate in next, Plates:GetChildren() do
+    if tostring(Plate.Owner.Value) ~= LocalPlayer.Name then
+        Plate:Destroy()
+    else
+        for _, Part in next, Plate.ActiveParts:GetChildren() do
+            if Part.Name == "Spikes" then
+                -- Update Position if needed
+                Position = Part.PrimaryPart.Parent.Box.Position
+            end
+        end
+    end
+end
