@@ -1,6 +1,6 @@
 # Script
 ```
-loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Loader'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Main'))()
 ```
 # Original found from:
 https://scriptblox.com/u/linhmcfake2
