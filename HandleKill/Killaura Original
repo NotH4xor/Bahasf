@@ -1,0 +1,43 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local function isSwordEquipped()
+local tool = player.Character and player.Character:FindFirstChildWhichIsA("Tool")
+local handle = tool and tool:FindFirstChild("Handle")
+return tool, handle
+end
+
+local function handleKillAll()
+if not firetouchinterest then
+print('Incompatible Exploit: Missing firetouchinterest')
+return
+end
+
+local tool, handle = isSwordEquipped()
+if not tool or not handle then
+print("Handle Kill: Need to hold a tool that deals damage on touch.")
+return
+end
+
+for _, targetPlayer in ipairs(Players:GetPlayers()) do
+if targetPlayer ~= player and targetPlayer.Character then
+local targetHumanoid = targetPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+if targetHumanoid and targetHumanoid.Health > 0 then
+for _, part in ipairs(targetPlayer.Character:GetChildren()) do
+if part:IsA("BasePart") then
+pcall(firetouchinterest, handle, part, 1)
+pcall(firetouchinterest, handle, part, 0)
+end
+end
+end
+end
+end
+end
+
+if isSwordEquipped() then
+handleKillAll()
+else
+print("Sword is not equipped.")
+end
