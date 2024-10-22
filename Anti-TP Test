@@ -1,0 +1,137 @@
+-- Anti-Teleport Script for Local Player with Toggle on X Keybind and Improved Notifications
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LPlayer = Players.LocalPlayer
+
+local toggleStatus = false
+local connection
+
+-- Notification Module
+local NotifyModule = {}
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+
+if not NotifyGui then
+getgenv().NotifyGui = Instance.new("ScreenGui")
+getgenv().Template = Instance.new("TextLabel")
+
+if syn then
+if gethui then
+gethui(NotifyGui)
+else
+syn.protect_gui(NotifyGui)
+end
+end
+
+NotifyGui.Name = "Notification"
+NotifyGui.Parent = CoreGui
+
+Template.Name = "Template"
+Template.Parent = NotifyGui
+Template.AnchorPoint = Vector2.new(.5, .5)
+Template.BackgroundTransparency = 1
+Template.BorderSizePixel = 0
+Template.Position = UDim2.new(.5, 0, .9, 0)
+Template.Size = UDim2.new(.8, 0, .1, 0)
+Template.Font = Enum.Font.Code
+Template.Text = ""
+Template.TextSize = 30
+Template.TextWrapped = true
+end
+
+local Tween = function(Object, Time, Style, Direction, Property)
+return TweenService:Create(Object, TweenInfo.new(Time, Enum.EasingStyle[Style], Enum.EasingDirection[Direction]), Property)
+end
+
+function NotifyModule:Notify(Text, Duration)
+task.spawn(function()
+-- Remove existing notifications
+for _, v in pairs(NotifyGui:GetChildren()) do
+if v.Name == "ClonedNotification" then
+v:Destroy()
+end
+end
+
+local Clone = Template:Clone()
+Clone.Name = "ClonedNotification"
+Clone.Parent = NotifyGui
+Clone.Text = Text
+Clone.TextColor3 = Color3.fromRGB(255, 25, 25)
+
+if not Duration or Duration == nil then
+Duration = 3
+end
+
+local TweenPos = Tween(Clone, 0.3, "Quart", "InOut", {Position = UDim2.new(.5, 0, .9, 0)})
+TweenPos:Play()
+TweenPos.Completed:Wait()
+
+wait(Duration)
+
+TweenPos = Tween(Clone, 0.3, "Quart", "InOut", {Position = UDim2.new(.5, 0, 1.5, 0)})
+TweenPos:Play()
+TweenPos.Completed:Wait()
+
+Clone:Destroy()
+end)
+end
+
+-- Function to protect from teleportation via StampAsset
+local function blockRemoteCalls()
+print("Anti-Teleport enabled") -- Debug print statement
+local meta = getrawmetatable(game)
+local originalIndex = meta.__index
+local originalNameCall = meta.__namecall
+setreadonly(meta, false)
+
+meta.__index = newcclosure(function(self, key)
+if tostring(self) == "StampAsset" and tostring(key) == "InvokeServer" then
+return function() return end  -- Block the invocation
+end
+return originalIndex(self, key)
+end)
+
+meta.__namecall = newcclosure(function(self, ...)
+local method = getnamecallmethod()
+if tostring(self) == "StampAsset" and method == "InvokeServer" then
+return -- Block the invocation
+end
+return originalNameCall(self, ...)
+end)
+
+setreadonly(meta, true)
+end
+
+-- Function to toggle anti-teleport script
+local function toggleAntiTeleport()
+toggleStatus = not toggleStatus
+if toggleStatus then
+connection = LPlayer.CharacterAdded:Connect(blockRemoteCalls)
+if LPlayer.Character then
+blockRemoteCalls()
+end
+NotifyModule:Notify("Anti-Teleport ON", 3)
+else
+if connection then
+connection:Disconnect()
+connection = nil
+end
+NotifyModule:Notify("Anti-Teleport OFF", 3)
+end
+end
+
+-- Function to handle input
+local function onInputBegan(input, gameProcessed)
+if gameProcessed then return end
+if input.KeyCode == Enum.KeyCode.X then
+toggleAntiTeleport()
+end
+end
+
+-- Connect input handler
+UserInputService.InputBegan:Connect(onInputBegan)
+
+-- Ensure the anti-teleport script is off by default
+toggleStatus = false
+NotifyModule:Notify("Anti-Teleport OFF", 3)
