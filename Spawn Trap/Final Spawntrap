@@ -1,17 +1,8 @@
 --[[
 v1.0   
-+ Added one time run check - Meaning.... If you spam the run/execute script button on
-your executor, it will run only once.
-
-Why?
-
-When you're running multiple accounts, the possibility of having multiple executions of 
-one code can bug the game
-
++ Added one time run check
 + Added optimization
-
 + Shortened code
-
 ]]
 
 if _G.ScriptAlreadyRan then
