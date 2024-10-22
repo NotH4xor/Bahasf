@@ -1,8 +1,11 @@
+--[[
++ Added Test Autojoin Script
+]]
 local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Spawn%20Trap/Final%20Spawntrap',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20rejoin',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
-
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20Rejoin/test%20autorejoin',
 }
 
 for _, url in ipairs(scripts) do
