@@ -1,0 +1,15 @@
+local scripts = {
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Spawn%20Trap/Final%20Spawntrap',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20rejoin',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
+
+}
+
+for _, url in ipairs(scripts) do
+    local thread = coroutine.create(function()
+        loadstring(game:HttpGet(url, true))()
+    end)
+    coroutine.resume(thread)
+end
+
+table.insert(scripts, "new_script_url")
