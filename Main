@@ -3,6 +3,7 @@ local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20Rejoin/anti-kick',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/HKILL',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Anti-TP',
 }
 
 for _, url in ipairs(scripts) do
