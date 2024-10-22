@@ -1,0 +1,25 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local function killAll()
+local tool = player.Character:FindFirstChildWhichIsA("Tool")
+if not tool or not tool:FindFirstChild("Handle") or not firetouchinterest then return end
+local handle = tool.Handle
+
+for _, target in ipairs(Players:GetPlayers()) do
+local char, hum = target.Character, target.Character and target.Character:FindFirstChildWhichIsA("Humanoid")
+if target ~= player and char and hum and hum.Health > 0 then
+for _, part in ipairs(char:GetChildren()) do
+if part:IsA("BasePart") then
+pcall(firetouchinterest, handle, part, 1)
+pcall(firetouchinterest, handle, part, 0)
+end
+end
+end
+end
+end
+
+RunService.RenderStepped:Connect(function()
+if player.Character:FindFirstChildWhichIsA("Tool") then killAll() end
+end)
