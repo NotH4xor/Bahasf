@@ -18,7 +18,7 @@ wait(1)
 loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Main'))()
 loadstring(game:HttpGet(('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'),true))()
 ```
-#
+# Antikick
 ```
 loadstring(game:HttpGet(('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiAdminKick'),true))()
 ```
