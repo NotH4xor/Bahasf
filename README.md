@@ -11,7 +11,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/fatesc/fates-admin/ma
 loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
 ```
 
-# Add this to your AutorRun Folder and Antikick seperate
+# Add this to your AutoRun Folder and Antikick seperate
 ```
 -- Add a 1-second delay before executing the script
 wait(1)
