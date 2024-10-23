@@ -18,6 +18,11 @@ wait(1)
 loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Main'))()
 loadstring(game:HttpGet(('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'),true))()
 ```
+#
+```
+loadstring(game:HttpGet(('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiAdminKick'),true))()
+```
+
 # Original found from:
 https://scriptblox.com/u/linhmcfake2
 
