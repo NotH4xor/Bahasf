@@ -1,0 +1,35 @@
+-- List of admin user IDs
+local adminIDs = {
+6189092855, 87654321, 23456789, 
+98765432
+}
+
+-- Convert the adminIDs array to a dictionary for O(1) lookups
+local adminDict = {}
+for _, id in ipairs(adminIDs) do
+    adminDict[id] = true
+end
+
+-- Get the RunService and Players references
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+-- Function to kick player if an admin is detected
+local function detectAndKick()
+    for _, player in pairs(Players:GetPlayers()) do
+        if adminDict[player.UserId] then
+            localPlayer:Kick("Admin Joined")
+            return
+        end
+    end
+end
+
+-- Initial check on all players in the game
+detectAndKick()
+
+-- Continuous check for new players joining
+Players.PlayerAdded:Connect(detectAndKick)
+
+-- Continuous check each frame for instant detection
+RunService.RenderStepped:Connect(detectAndKick)
