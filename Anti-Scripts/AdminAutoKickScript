@@ -1,0 +1,48 @@
+local rawAdminIDs = [[
+
+30888938  -- ZCOLINZ (The Owner)
+24291721  -- yerja
+856955432 -- Ben (Dev Role in group )
+28715944 -- Guppy (Dev Role in group )
+295255058 -- Finn ( Dev Role in group )
+336666561 -- ZNILOCZ ( Owners Alt )
+
+]]
+
+local Players = game:GetService("Players")
+
+-- convert the multiline string into a table of numbers
+local adminIDs = {}
+for id in string.gmatch(rawAdminIDs, "%d+") do
+table.insert(adminIDs, tonumber(id))
+end
+
+local function isAdmin(player)
+for _, adminID in ipairs(adminIDs) do
+if player.UserId == adminID then
+return true
+end
+end
+return false
+end
+
+local function kickIfAdmin(player)
+if isAdmin(player) then
+game.Players.LocalPlayer:Kick("An admin has joined the game. You have been disconnected.")
+end
+end
+
+-- perform an initial check for admins already in-game
+for _, player in ipairs(Players:GetPlayers()) do
+kickIfAdmin(player)
+end
+
+-- handle new players joining
+Players.PlayerAdded:Connect(kickIfAdmin)
+
+-- monitor for any descendants added, including edge cases
+game.DescendantAdded:Connect(function(descendant)
+if descendant:IsA("Player") then
+kickIfAdmin(descendant)
+end
+end)
