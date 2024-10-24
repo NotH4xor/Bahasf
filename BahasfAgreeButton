@@ -1,0 +1,33 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local gui = player:WaitForChild("PlayerGui"):WaitForChild("MainScreen"):WaitForChild("Frame"):WaitForChild("Rules")
+local button = gui:WaitForChild("AgreeButton")
+
+local function clickAgreeButton()
+    if not button then
+        warn("AgreeButton not found!")
+        return
+    end
+
+    local clickFunctionConnections = getconnections(button.MouseButton1Click)
+    for _, connection in ipairs(clickFunctionConnections) do
+        if connection.Function then
+            coroutine.wrap(connection.Function)()
+        end
+    end
+end
+
+coroutine.wrap(clickAgreeButton)()
+
+-- remove the Blur effect from Lighting
+local lighting = game:GetService("Lighting")
+local blur = lighting:FindFirstChild("Blur")
+if blur then
+blur:Destroy()
+end
+
+-- perform the required actions
+local replicatedStorage = game:GetService("ReplicatedStorage")
+replicatedStorage.Remotes.InitialSpawn:FireServer()
+replicatedStorage.Remotes.DeleteHologram:FireServer()
+end
