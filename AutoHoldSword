@@ -1,0 +1,30 @@
+local player = game:GetService("Players").LocalPlayer
+
+local function equipTool()
+wait(1)
+local tool = player.Backpack:FindFirstChild("3 Sword")
+if tool then player.Character.Humanoid:EquipTool(tool) end
+end
+
+player.CharacterAdded:Connect(equipTool)
+if player.Character then equipTool() end
+
+game:GetService("RunService").RenderStepped:Connect(function()
+local tool = player.Backpack:FindFirstChild("3 Sword")
+if not player.Character:FindFirstChild("3 Sword") and tool then
+player.Character.Humanoid:EquipTool(tool)
+end
+tool = player.Character and player.Character:FindFirstChild("3 Sword")
+if tool and tool:FindFirstChild("Handle") then
+for _, target in ipairs(game:GetService("Players"):GetPlayers()) do
+if target ~= player and target.Character then
+for _, part in ipairs(target.Character:GetChildren()) do
+if part:IsA("BasePart") then
+pcall(firetouchinterest, tool.Handle, part, 1)
+pcall(firetouchinterest, tool.Handle, part, 0)
+end
+end
+end
+end
+end
+end)
