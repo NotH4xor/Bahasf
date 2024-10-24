@@ -18,16 +18,3 @@ local function clickAgreeButton()
 end
 
 coroutine.wrap(clickAgreeButton)()
-
--- remove the Blur effect from Lighting
-local lighting = game:GetService("Lighting")
-local blur = lighting:FindFirstChild("Blur")
-if blur then
-blur:Destroy()
-end
-
--- perform the required actions
-local replicatedStorage = game:GetService("ReplicatedStorage")
-replicatedStorage.Remotes.InitialSpawn:FireServer()
-replicatedStorage.Remotes.DeleteHologram:FireServer()
-end
