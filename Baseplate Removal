@@ -2,15 +2,17 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Plates = workspace:FindFirstChild("Plates")
 
-for _, Plate in next, Plates:GetChildren() do
-    if tostring(Plate.Owner.Value) ~= LocalPlayer.Name then
-        Plate:Destroy()
-    else
-        for _, Part in next, Plate.ActiveParts:GetChildren() do
-            if Part.Name == "Spikes" then
-                -- Update Position if needed
-                Position = Part.PrimaryPart.Parent.Box.Position
-            end
-        end
-    end
+-- Add a delay to ensure the game has assigned the owner to the plates
+task.wait(2)
+
+if Plates then
+for _, Plate in ipairs(Plates:GetChildren()) do
+-- Check if the Plate has an "Owner"
+if Plate:FindFirstChild("Owner") then
+-- If the Plate's owner is not the local player, destroy the Plate
+if tostring(Plate.Owner.Value) ~= LocalPlayer.Name then
+Plate:Destroy()
+end
+end
+end
 end
