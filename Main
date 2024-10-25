@@ -2,14 +2,13 @@ local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Spawn%20Trap/Final%20Spawntrap',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Baseplate%20Removal',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Auto%20Rejoin/anti-kick',
-    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/HKILL',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/TEST%20ZERO%20PPL%20SERVERHOP',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiBed',
-    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AutoHoldSword',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/ChatSpy',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiAdminKick',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AutoSpawn',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/ServerHopKeybindP',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/HandleKill/FixedCrashHKILL',
 }
 
 for _, url in ipairs(scripts) do
