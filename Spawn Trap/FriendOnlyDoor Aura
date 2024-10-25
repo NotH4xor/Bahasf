@@ -1,0 +1,63 @@
+local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local Plates = workspace:FindFirstChild("Plates")
+
+-- Function to get the plate assigned to the local player
+local function getAssignedPlate()
+if Plates then
+for _, plate in ipairs(Plates:GetChildren()) do
+if plate:FindFirstChild("Owner") and tostring(plate.Owner.Value) == player.Name then
+return plate
+end
+end
+end
+return nil
+end
+
+-- Variable to check if the interaction has already fired for each player
+local firedPlayers = {}
+
+-- Run this function every frame
+game:GetService("RunService").RenderStepped:Connect(function()
+local plate = getAssignedPlate()
+if plate then
+local activeParts = plate:FindFirstChild("ActiveParts")
+if activeParts then
+local hostileObject = activeParts:FindFirstChild("Friend Only Door - Hostile")
+if hostileObject then
+local friendOnlyDoorHostile = hostileObject:FindFirstChild("FriendOnlyDoorHostile")
+if friendOnlyDoorHostile then
+
+-- Iterate through all base parts with TouchInterest in FriendOnlyDoorHostile
+for _, child in ipairs(friendOnlyDoorHostile:GetChildren()) do
+if child:IsA("BasePart") and child:FindFirstChild("TouchInterest") then
+local laser = child
+
+-- Iterate through all players in the game
+for _, target in ipairs(Players:GetPlayers()) do
+local char = target.Character
+
+-- Ensure we're not targeting the local player, and the character has a humanoid
+if target ~= player and char and char:FindFirstChildWhichIsA("Humanoid") then
+if not firedPlayers[target.Name] then
+-- Go through all parts of the character
+for _, part in ipairs(char:GetChildren()) do
+if part:IsA("BasePart") then
+-- Interact with the laser
+pcall(firetouchinterest, part, laser, 1)
+pcall(firetouchinterest, part, laser, 0)
+end
+end
+-- Mark this player as fired to avoid duplicate execution
+firedPlayers[target.Name] = true
+end
+end
+end
+
+end
+end
+end
+end
+end
+end
+end)
