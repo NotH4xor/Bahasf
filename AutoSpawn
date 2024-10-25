@@ -1,0 +1,9 @@
+-- function to perform the actions
+local function performActions()
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    replicatedStorage.Remotes.InitialSpawn:FireServer()
+    replicatedStorage.Remotes.DeleteHologram:FireServer()
+end
+
+-- automatically call the function
+performActions()
