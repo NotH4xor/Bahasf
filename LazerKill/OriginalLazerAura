@@ -1,0 +1,61 @@
+local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local Plates = workspace:FindFirstChild("Plates")
+local firedPlayers = {}
+
+local function getAssignedPlate()
+for _, plate in ipairs(Plates:GetChildren()) do
+if plate:FindFirstChild("Owner") and tostring(plate.Owner.Value) == player.Name then
+return plate
+end
+end
+return nil
+end
+
+local function fireInterests()
+while player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 do
+local plate = getAssignedPlate()
+if plate then
+local activeParts = plate:FindFirstChild("ActiveParts")
+local hostileObject = activeParts and activeParts:FindFirstChild("Friend Only Door - Hostile")
+local friendOnlyDoorHostile = hostileObject and hostileObject:FindFirstChild("FriendOnlyDoorHostile")
+
+if friendOnlyDoorHostile then
+for _, child in ipairs(friendOnlyDoorHostile:GetChildren()) do
+if child:IsA("BasePart") and child:FindFirstChild("TouchInterest") then
+local laser = child
+for _, target in ipairs(Players:GetPlayers()) do
+local targetChar = target.Character
+local targetHumanoid = targetChar and targetChar:FindFirstChildWhichIsA("Humanoid")
+
+if target ~= player and targetHumanoid and targetHumanoid.Health > 0 then
+for _, part in ipairs(targetChar:GetChildren()) do
+if part:IsA("BasePart") then
+pcall(firetouchinterest, part, laser, 1)
+pcall(firetouchinterest, part, laser, 0)
+end
+end
+firedPlayers[target.Name] = true
+end
+end
+end
+end
+end
+end
+wait(0.1) -- Slight delay to prevent overwhelming the server
+end
+firedPlayers = {} -- Reset firedPlayers when the loop exits
+end
+
+local function onCharacterAdded(character)
+local humanoid = character:WaitForChild("Humanoid")
+humanoid.Died:Connect(function()
+firedPlayers = {}
+end)
+fireInterests()
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+if player.Character then
+onCharacterAdded(player.Character)
+end
