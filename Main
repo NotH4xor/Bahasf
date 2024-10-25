@@ -8,7 +8,7 @@ local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiAdminKick',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AutoSpawn',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/ServerHopKeybindP',
-    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/HandleKill/FixedCrashHKILL',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/FixCrashSword',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Anti-Friends',
 }
 
