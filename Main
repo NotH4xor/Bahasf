@@ -6,6 +6,9 @@ local scripts = {
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/TEST%20ZERO%20PPL%20SERVERHOP',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiBed',
     'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AutoHoldSword',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/ChatSpy',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AntiAdminKick',
+    'https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/AutoSpawn',
 }
 
 for _, url in ipairs(scripts) do
@@ -16,3 +19,6 @@ for _, url in ipairs(scripts) do
 end
 
 table.insert(scripts, "new_script_url")
+
+wait(1)
+loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/BahasfAgreeButton'))()
