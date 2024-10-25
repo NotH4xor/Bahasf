@@ -23,3 +23,6 @@ table.insert(scripts, "new_script_url")
 
 wait(1)
 loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/BahasfAgreeButton'))()
+
+wait(3)
+loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Anti-Friends'))()
