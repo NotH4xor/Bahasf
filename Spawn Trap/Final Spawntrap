@@ -1,9 +1,3 @@
---[[
-v1.0   
-+ Added one time run check
-+ Added optimization
-+ Shortened code
-]]
 
 if _G.ScriptAlreadyRan then
     print("Script already ran, exiting...")
