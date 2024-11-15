@@ -1,0 +1,84 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Plates = workspace:FindFirstChild("Plates")
+local firedPlayers = {}
+
+-- function to find the local player's plate
+local function findLocalPlayerPlate()
+    for _, plate in ipairs(Plates:GetChildren()) do
+        if plate:FindFirstChild("Owner") and tostring(plate.Owner.Value) == LocalPlayer.Name then
+            return plate
+        end
+    end
+    return nil
+end
+
+-- function to handle firing touch interest
+local function handleTouchInterest()
+    local myPlate = findLocalPlayerPlate()
+    if myPlate then
+        local activeParts = myPlate:FindFirstChild("ActiveParts")
+        local friendOnlyDoorHostile = activeParts and activeParts:FindFirstChild("Friend Only Door - Hostile")
+        local hostileDoor = friendOnlyDoorHostile and friendOnlyDoorHostile:FindFirstChild("FriendOnlyDoorHostile")
+
+        if hostileDoor then
+            for _, part in ipairs(hostileDoor:GetChildren()) do
+                if part:IsA("BasePart") and part:FindFirstChild("TouchInterest") then
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer then
+                            local character = player.Character
+                            local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+
+                            if humanoid and humanoid.Health > 0 and not firedPlayers[player.Name] then
+                                firedPlayers[player.Name] = true
+
+                                for _, charPart in ipairs(character:GetChildren()) do
+                                    if charPart:IsA("BasePart") then
+                                        pcall(firetouchinterest, charPart, part, 1)
+                                        pcall(firetouchinterest, charPart, part, 0)
+                                    end
+                                end
+                            else
+                                firedPlayers[player.Name] = nil
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- function to handle character death
+local function onCharacterDeath()
+    firedPlayers = {}
+end
+
+-- function to handle player removal
+local function onPlayerRemoving(player)
+    firedPlayers[player.Name] = nil
+end
+
+-- function to handle character addition
+local function onCharacterAdded(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    humanoid.Died:Connect(onCharacterDeath)
+    -- start handling touch interest in a loop
+    spawn(function()
+        while humanoid.Health > 0 do
+            handleTouchInterest()
+            wait(0.2)
+        end
+    end)
+end
+
+-- connect character added event
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- if character exists, handle it
+if LocalPlayer.Character then
+    onCharacterAdded(LocalPlayer.Character)
+end
+
+-- connect player removing event
+Players.PlayerRemoving:Connect(onPlayerRemoving)
