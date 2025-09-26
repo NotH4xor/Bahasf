@@ -1,0 +1,174 @@
+-- ✅ One-time guard
+if _G.KillSystemActive then
+    warn("🚫 Kill system already active")
+    return
+end
+_G.KillSystemActive = true
+
+--// Services
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LPlayer = Players.LocalPlayer
+local StampAsset = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset")
+local LPlate
+
+--// Find local plate
+do
+    local Plates = Workspace:WaitForChild("Plates")
+    for _, plate in ipairs(Plates:GetChildren()) do
+        if plate:FindFirstChild("Owner") and plate.Owner.Value == LPlayer then
+            LPlate = plate:WaitForChild("Plate")
+            break
+        end
+    end
+end
+
+--// KillModule
+local KillModule = {}
+
+local function resolveTarget(target)
+    if target:IsA("Player") then
+        local char = target.Character or target.CharacterAdded:Wait()
+        return char:WaitForChild("HumanoidRootPart", 5)
+    elseif target:IsA("BasePart") then
+        return target
+    end
+end
+
+local function invokeStamp(parts, cframe)
+    if not parts or not StampAsset then return end
+    local ok, res = pcall(function()
+        return StampAsset:InvokeServer(41324885, cframe, "{}", parts, 0)
+    end)
+    if not ok then
+        warn("[StampAsset Failed]:", res)
+    end
+    return res
+end
+
+function KillModule.Kill(target, cframeOverride)
+    local part = resolveTarget(target)
+    if part and LPlate then
+        local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
+        return invokeStamp({ part }, dest)
+    end
+end
+
+function KillModule.KillMany(targets, cframeOverride)
+    local parts = {}
+    for _, t in ipairs(targets) do
+        local p = resolveTarget(t)
+        if p then table.insert(parts, p) end
+    end
+    if #parts > 0 and LPlate then
+        local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
+        return invokeStamp(parts, dest)
+    end
+end
+
+function KillModule.AttachAll(interval)
+    interval = interval or 0.1
+    task.spawn(function()
+        while task.wait(interval) do
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
+                    local part = resolveTarget(player)
+                    if part and LPlate then
+                        invokeStamp({ part }, LPlate.CFrame)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+--// Auto monitor respawns
+local function monitorPlayer(player)
+    if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
+        player.CharacterAdded:Connect(function(character)
+            local hrp = character:WaitForChild("HumanoidRootPart")
+            KillModule.Kill(hrp)
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(monitorPlayer)
+for _, p in ipairs(Players:GetPlayers()) do
+    monitorPlayer(p)
+end
+
+--// Start enforcement
+KillModule.AttachAll(0.1)
+
+-- ✅ Camera crash guard
+local function safeCameraFix()
+    local cam = Workspace.CurrentCamera
+    if cam and typeof(cam.CameraType) == "EnumItem" then
+        cam.CameraType = Enum.CameraType.Custom
+    end
+end
+task.spawn(function()
+    task.wait(0.1)
+    safeCameraFix()
+end)
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    task.wait(0.1)
+    safeCameraFix()
+end)
+
+print("✅ Kill system started (with camera crash guard)")
+
+-- =====================================================
+-- 🌍 ServerHop integration w/ queued teleport reinjection
+-- =====================================================
+local order = "Desc"
+
+local function ServerHop()
+    local url = string.format(
+        "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
+        game.PlaceId, order
+    )
+    local Server = nil
+
+    repeat
+        local success, result = pcall(game.HttpGet, game, url)
+        if success then
+            local decoded = HttpService:JSONDecode(result)
+            local servers = decoded.data
+            for _, v in ipairs(servers) do
+                if v.maxPlayers > v.playing and v.id ~= game.JobId then
+                    Server = v
+                    break
+                end
+            end
+            if Server then
+                -- 🔑 Queue reinjection here
+                if queue_on_teleport or queueteleport then
+                    (queue_on_teleport or queueteleport)([[
+                        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+                    ]])
+                end
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id)
+                return
+            end
+            url = string.format(
+                "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s",
+                game.PlaceId, order, decoded.nextPageCursor or ""
+            )
+        end
+        task.wait(2)
+    until false
+end
+
+-- Run hopping watcher in parallel
+task.spawn(function()
+    while task.wait(1) do
+        if #Players:GetPlayers() == 2 then
+            ServerHop()
+        end
+    end
+end)
