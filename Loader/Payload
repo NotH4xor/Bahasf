@@ -1,5 +1,5 @@
 -- =====================================================
--- ✅ Persistent Payload Loader (IY-style, with writefile)
+-- ✅ KillSystem with IY-style Persistence (qot + autoexec fallback)
 -- =====================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -11,42 +11,69 @@ local qot = pick(rawget(getfenv(), "queue_on_teleport"))
     or (syn and pick(syn.queue_on_teleport))
     or (fluxus and pick(fluxus.queue_on_teleport))
 
--- Disk API shims
 local writefile = pick(writefile)
 local readfile  = pick(readfile)
 local isfile    = pick(isfile)
 
--- Paths & URLs
-local PAYLOAD_URL  = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
-local PAYLOAD_PATH = "KillSystem_Payload.lua"
+-- Paths
+local PAYLOAD_URL   = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
+local PAYLOAD_PATH  = "KillSystem_Payload.lua"
+local AUTOEXEC_PATH = "autoexec/KillSystem_AutoExec.lua"
 
--- Step 1: Write payload to disk if needed
+-- =====================================================
+-- 🔒 Autoexec installer (runs once)
+-- =====================================================
+local function installAutoexec()
+    if not (writefile and readfile) then return end
+
+    -- Cache payload to disk
+    local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
+    if ok and res then
+        pcall(writefile, PAYLOAD_PATH, res)
+        print("[Installer] Cached KillSystem payload to disk.")
+    else
+        warn("[Installer] Failed to fetch payload:", res)
+    end
+
+    -- Drop bootstrapper into autoexec
+    local bootstrap = ([[
+        if isfile("%s") then
+            loadstring(readfile("%s"))()
+            print("[BOOTSTRAP] KillSystem reinjected from autoexec.")
+        end
+    ]]):format(PAYLOAD_PATH, PAYLOAD_PATH)
+
+    pcall(writefile, AUTOEXEC_PATH, bootstrap)
+    print("[Installer] KillSystem autoexec installed.")
+end
+
+-- =====================================================
+-- 🔁 Queue shim (qot if supported, autoexec fallback)
+-- =====================================================
 local function ensurePayloadCached()
     if writefile and readfile and (not isfile or not isfile(PAYLOAD_PATH)) then
-        print("[QOT] Downloading and caching payload...")
         local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
         if ok and res then
             pcall(writefile, PAYLOAD_PATH, res)
-        else
-            warn("[QOT] Failed to download payload:", res)
+            print("[QOT] Cached payload to disk.")
         end
     end
 end
 
--- Step 2: Queue from disk
 local function queuePayload(reason)
     if qot and readfile then
         print(("[QOT] Queued payload (%s) from disk"):format(reason or ""))
         pcall(qot, ('loadstring(readfile("%s"))()'):format(PAYLOAD_PATH))
     elseif qot then
-        print(("[QOT] Queued payload (%s) from URL (no writefile support)"):format(reason or ""))
+        print(("[QOT] Queued payload (%s) from URL"):format(reason or ""))
         pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
     else
-        warn("[QOT] queue_on_teleport not supported")
+        print("[QOT] queue_on_teleport not supported, relying on autoexec fallback")
+        installAutoexec()
     end
 end
 
--- Prime cache + pre-queue
+-- Prime cache + queue if supported
 ensurePayloadCached()
 queuePayload("startup")
 
@@ -69,13 +96,12 @@ Players.LocalPlayer.OnTeleport:Connect(function(state)
     end
 end)
 
-print("✅ Persistence system ready (IY-style with file caching)")
+print("✅ Persistence system ready (qot + autoexec fallback)")
 
 -- =====================================================
--- 🚀 Kill System (with AttachAll, respawn monitor, etc.)
+-- 🚀 Kill System
 -- =====================================================
 
--- ✅ One-time guard (per JobId, not per session)
 if _G.KillSystemActive and _G.KillSystemActiveJobId == game.JobId then
     warn("🚫 Kill system already active in this server")
     return
@@ -199,7 +225,7 @@ end)
 print("✅ Kill system started (with camera crash guard)")
 
 -- =====================================================
--- 🌍 ServerHop (with pre-hop requeue)
+-- 🌍 ServerHop (with pre-hop queue or autoexec)
 -- =====================================================
 
 local order = "Desc"
