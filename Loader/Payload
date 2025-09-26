@@ -19,23 +19,31 @@ local qot = pick(rawget(getfenv(), "queue_on_teleport"))
 
 --// Payload
 local PAYLOAD_URL = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
-local function queuePayload()
+local function queuePayload(reason)
     if qot then
+        print(("[QOT] Queued payload (%s)"):format(reason or "no reason"))
         pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+    else
+        warn("[QOT] queue_on_teleport not supported in this executor")
     end
 end
 
 -- Pre-queue immediately (IY style)
-queuePayload()
+queuePayload("startup")
 
 -- Backup: also queue when teleport starts
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 
-TeleportService.TeleportInitFailed:Connect(queuePayload)
+TeleportService.TeleportInitFailed:Connect(function()
+    queuePayload("TeleportInitFailed")
+end)
+
 Players.LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.Started then
-        queuePayload()
+        queuePayload("OnTeleport.Started")
+    elseif state == Enum.TeleportState.InProgress then
+        queuePayload("OnTeleport.InProgress")
     end
 end)
 
@@ -178,7 +186,7 @@ local function ServerHop()
                 end
             end
             if chosen then
-                queuePayload() -- pre-hop
+                queuePayload("ServerHop pre-hop")
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
                 return
             end
