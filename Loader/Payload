@@ -6,10 +6,9 @@ end
 _G.KillSystemActive = true
 _G.KillSystemActiveJobId = game.JobId
 
--- Match IY timing
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Executor-agnostic queue shim (Synapse, Fluxus, etc.)
+--// Executor-agnostic queue shim
 local function pick(fn)
     return (type(fn) == "function") and fn or nil
 end
@@ -18,31 +17,36 @@ local qot = pick(rawget(getfenv(), "queue_on_teleport"))
     or (syn and pick(syn.queue_on_teleport))
     or (fluxus and pick(fluxus.queue_on_teleport))
 
--- Always self-queue for next teleport (IY style persistence)
+--// Payload
 local PAYLOAD_URL = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
-if qot then
-    pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+local function queuePayload()
+    if qot then
+        pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+    end
 end
 
--- Also hook Player.OnTeleport (covers all teleport types, like IY keepiy)
-local TeleportQueued = false
-game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
-    if qot and not TeleportQueued then
-        TeleportQueued = true
-        pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+-- Pre-queue immediately (IY style)
+queuePayload()
+
+-- Backup: also queue when teleport starts
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+TeleportService.TeleportInitFailed:Connect(queuePayload)
+Players.LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.Started then
+        queuePayload()
     end
 end)
 
 --// Services
 local HttpService       = game:GetService("HttpService")
-local TeleportService   = game:GetService("TeleportService")
-local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
 
-local LPlayer   = Players.LocalPlayer
-local Remotes   = ReplicatedStorage:WaitForChild("Remotes")
-local StampAsset= Remotes:WaitForChild("StampAsset")
+local LPlayer    = Players.LocalPlayer
+local Remotes    = ReplicatedStorage:WaitForChild("Remotes")
+local StampAsset = Remotes:WaitForChild("StampAsset")
 local LPlate
 
 --// Find local plate
@@ -174,9 +178,7 @@ local function ServerHop()
                 end
             end
             if chosen then
-                if qot then
-                    pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
-                end
+                queuePayload() -- pre-hop
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
                 return
             end
