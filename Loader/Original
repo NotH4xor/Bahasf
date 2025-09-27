@@ -158,10 +158,10 @@ local function ServerHop()
     until false
 end
 
--- 🌟 Watching for new friends to join
+-- 🌟 Watching for low-population servers
 task.spawn(function()
     while task.wait(1) do
-        if #Players:GetPlayers() == 2 then
+        if #Players:GetPlayers() <= 2 then
             ServerHop()
         end
     end
