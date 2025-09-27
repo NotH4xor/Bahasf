@@ -1,79 +1,103 @@
 -- =====================================================
--- ✅ KillSystem with IY-style Persistence (qot + autoexec fallback)
+-- ✅ KillSystem with canonical PAYLOAD_URL, qot (%q) + writefile/autoexec fallback
 -- =====================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Executor-agnostic helpers
+-- simple resolver helper
 local function pick(fn) return (type(fn) == "function") and fn or nil end
+
+-- resolve queue_on_teleport exactly (syn/fluxus aliases included)
 local qot = pick(rawget(getfenv(), "queue_on_teleport"))
     or pick(rawget(getfenv(), "queueteleport"))
     or (syn and pick(syn.queue_on_teleport))
     or (fluxus and pick(fluxus.queue_on_teleport))
 
+-- disk APIs (if available)
 local writefile = pick(writefile)
 local readfile  = pick(readfile)
 local isfile    = pick(isfile)
 
--- Paths
+-- canonical raw URL (use plain raw.githubusercontent.com form)
 local PAYLOAD_URL   = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
 local PAYLOAD_PATH  = "KillSystem_Payload.lua"
 local AUTOEXEC_PATH = "autoexec/KillSystem_AutoExec.lua"
 
 -- =====================================================
--- 🔒 Autoexec installer (runs once)
+-- Installer that caches payload & drops tiny autoexec bootstrap (runs once if needed)
 -- =====================================================
 local function installAutoexec()
-    if not (writefile and readfile) then return end
+    if not (writefile and readfile) then
+        warn("[Installer] writefile/readfile not available -> cannot install autoexec fallback")
+        return
+    end
 
-    -- Cache payload to disk
+    -- fetch payload and save to disk
     local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
     if ok and res then
         pcall(writefile, PAYLOAD_PATH, res)
-        print("[Installer] Cached KillSystem payload to disk.")
+        print("[Installer] Cached KillSystem payload to disk:", PAYLOAD_PATH)
     else
         warn("[Installer] Failed to fetch payload:", res)
     end
 
-    -- Drop bootstrapper into autoexec
-    local bootstrap = ([[
-        if isfile("%s") then
-            loadstring(readfile("%s"))()
-            print("[BOOTSTRAP] KillSystem reinjected from autoexec.")
-        end
-    ]]):format(PAYLOAD_PATH, PAYLOAD_PATH)
+    -- tiny bootstrapper that autoexec will run on next join
+    local bootstrap = ([[ 
+-- KillSystem auto-bootstrap (dropped by installer)
+if isfile(%q) and readfile then
+    local s, e = pcall(loadstring, readfile(%q))
+    if s then
+        pcall(e)
+        print("[BOOTSTRAP] KillSystem reinjected from autoexec.")
+    else
+        warn("[BOOTSTRAP] Failed to load payload:", e)
+    end
+end
+]]):format(PAYLOAD_PATH, PAYLOAD_PATH)
 
-    pcall(writefile, AUTOEXEC_PATH, bootstrap)
-    print("[Installer] KillSystem autoexec installed.")
+    -- write the bootstrap into autoexec folder
+    local ok2, err2 = pcall(writefile, AUTOEXEC_PATH, bootstrap)
+    if ok2 then
+        print("[Installer] Autoexec bootstrap written to:", AUTOEXEC_PATH)
+    else
+        warn("[Installer] Failed to write autoexec bootstrap:", err2)
+    end
 end
 
 -- =====================================================
--- 🔁 Queue shim (qot if supported, autoexec fallback)
+-- Queue helpers: prefer queuing a readfile-loaded payload if cached, else queue URL
 -- =====================================================
 local function ensurePayloadCached()
     if writefile and readfile and (not isfile or not isfile(PAYLOAD_PATH)) then
         local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
         if ok and res then
             pcall(writefile, PAYLOAD_PATH, res)
-            print("[QOT] Cached payload to disk.")
+            print("[QOT] Cached payload to disk:", PAYLOAD_PATH)
+        else
+            warn("[QOT] Could not fetch payload for caching:", res)
         end
     end
 end
 
 local function queuePayload(reason)
-    if qot and readfile then
-        print(("[QOT] Queued payload (%s) from disk"):format(reason or ""))
-        pcall(qot, ('loadstring(readfile("%s"))()'):format(PAYLOAD_PATH))
-    elseif qot then
-        print(("[QOT] Queued payload (%s) from URL"):format(reason or ""))
-        pcall(qot, ('loadstring(game:HttpGet("%s"))()'):format(PAYLOAD_URL))
+    reason = reason or ""
+    if qot then
+        if readfile and isfile and isfile(PAYLOAD_PATH) then
+            print(("[QOT] Queued payload (disk) — %s"):format(reason))
+            -- queue a payload that will read from disk on next server
+            pcall(qot, ("loadstring(readfile(%q))()"):format(PAYLOAD_PATH))
+        else
+            print(("[QOT] Queued payload (URL) — %s"):format(reason))
+            -- queue a payload that will fetch the remote URL on next server
+            pcall(qot, ("loadstring(game:HttpGet(%q))()"):format(PAYLOAD_URL))
+        end
     else
-        print("[QOT] queue_on_teleport not supported, relying on autoexec fallback")
+        print("[QOT] queue_on_teleport not supported — installing autoexec fallback")
         installAutoexec()
     end
 end
 
--- Prime cache + queue if supported
+-- Prime cache + pre-queue
 ensurePayloadCached()
 queuePayload("startup")
 
@@ -96,12 +120,13 @@ Players.LocalPlayer.OnTeleport:Connect(function(state)
     end
 end)
 
-print("✅ Persistence system ready (qot + autoexec fallback)")
+print("✅ Persistence system armed (qot + autoexec fallback)")
 
 -- =====================================================
--- 🚀 Kill System
+-- Kill System (unchanged core)
 -- =====================================================
 
+-- one-time guard per JobId
 if _G.KillSystemActive and _G.KillSystemActiveJobId == game.JobId then
     warn("🚫 Kill system already active in this server")
     return
@@ -225,10 +250,10 @@ end)
 print("✅ Kill system started (with camera crash guard)")
 
 -- =====================================================
--- 🌍 ServerHop (with pre-hop queue or autoexec)
+-- ServerHop (pre-queue and teleport)
 -- =====================================================
-
 local order = "Desc"
+local TeleportService = game:GetService("TeleportService")
 
 local function ServerHop()
     local url = string.format(
