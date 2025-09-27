@@ -1,0 +1,151 @@
+-- Friendly Player System
+if _G.FriendlySystemActive then warn("🚫 Friendly system already active") return end
+_G.FriendlySystemActive = true
+
+local PlayersService = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local WorkspaceService = game:GetService("Workspace")
+local LocalPlayer = PlayersService.LocalPlayer
+local FriendlyRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset")
+local PlayerPlate
+
+do
+    local PlatesFolder = WorkspaceService:WaitForChild("Plates")
+    for _, Plate in ipairs(PlatesFolder:GetChildren()) do
+        if Plate:FindFirstChild("Owner") and Plate.Owner.Value == LocalPlayer then
+            PlayerPlate = Plate:WaitForChild("Plate")
+            break
+        end
+    end
+end
+
+local FriendlyActions = {}
+local function GetPlayerRoot(Target)
+    if Target:IsA("Player") then
+        local Character = Target.Character or Target.CharacterAdded:Wait()
+        return Character:WaitForChild("HumanoidRootPart", 5)
+    elseif Target:IsA("BasePart") then
+        return Target
+    end
+end
+
+local function SendFriendlySignal(Targets, Position)
+    if not Targets or not FriendlyRemote then return end
+    local Success, Result = pcall(function()
+        return FriendlyRemote:InvokeServer(41324885, Position, "{}", Targets, 0)
+    end)
+    if not Success then warn("[Friendly Signal Failed]:", Result) end
+    return Result
+end
+
+function FriendlyActions.Hug(Target, Position)
+    local TargetRoot = GetPlayerRoot(Target)
+    if TargetRoot and PlayerPlate then
+        local NewPosition = Position or PlayerPlate.CFrame - Vector3.new(0, 9e9, 0)
+        return SendFriendlySignal({TargetRoot}, NewPosition)
+    end
+end
+
+function FriendlyActions.GroupHug(TargetList, Position)
+    local TargetRoots = {}
+    for _, Target in ipairs(TargetList) do
+        local Root = GetPlayerRoot(Target)
+        if Root then table.insert(TargetRoots, Root) end
+    end
+    if #TargetRoots > 0 and PlayerPlate then
+        local NewPosition = Position or PlayerPlate.CFrame - Vector3.new(0, 9e9, 0)
+        return SendFriendlySignal(TargetRoots, NewPosition)
+    end
+end
+
+function FriendlyActions.BefriendAll(Interval)
+    Interval = Interval or 0.1
+    task.spawn(function()
+        while task.wait(Interval) do
+            for _, OtherPlayer in ipairs(PlayersService:GetPlayers()) do
+                if OtherPlayer ~= LocalPlayer and not LocalPlayer:IsFriendsWith(OtherPlayer.UserId) then
+                    local TargetRoot = GetPlayerRoot(OtherPlayer)
+                    if TargetRoot and PlayerPlate then
+                        SendFriendlySignal({TargetRoot}, PlayerPlate.CFrame)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function WelcomeNewPlayer(NewPlayer)
+    if NewPlayer ~= LocalPlayer and not LocalPlayer:IsFriendsWith(NewPlayer.UserId) then
+        NewPlayer.CharacterAdded:Connect(function(Character)
+            local RootPart = Character:WaitForChild("HumanoidRootPart")
+            FriendlyActions.Hug(RootPart)
+        end)
+    end
+end
+
+PlayersService.PlayerAdded:Connect(WelcomeNewPlayer)
+for _, ExistingPlayer in ipairs(PlayersService:GetPlayers()) do
+    WelcomeNewPlayer(ExistingPlayer)
+end
+
+FriendlyActions.BefriendAll(0.1)
+
+local function EnsureFriendlyCamera()
+    local CurrentCamera = WorkspaceService.CurrentCamera
+    if CurrentCamera and typeof(CurrentCamera.CameraType) == "EnumItem" then
+        CurrentCamera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+task.spawn(function()
+    task.wait(0.1)
+    EnsureFriendlyCamera()
+end)
+
+WorkspaceService:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    task.wait(0.1)
+    EnsureFriendlyCamera()
+end)
+
+print("✅ Friendly system started (with camera crash guard)")
+
+-- Friendly Place Visiting
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local SortOrder = "Desc"
+
+local function VisitNewPlace()
+    local Url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100", game.PlaceId, SortOrder)
+    local NewPlace = nil
+
+    repeat
+        local Success, Result = pcall(game.HttpGet, game, Url)
+        if Success then
+            local Servers = HttpService:JSONDecode(Result).data
+            for _, Server in ipairs(Servers) do
+                if Server.maxPlayers > Server.playing and Server.id ~= game.JobId then
+                    NewPlace = Server
+                    break
+                end
+            end
+            if NewPlace then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, NewPlace.id)
+                return
+            end
+            Url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s", game.PlaceId, SortOrder, Servers.nextPageCursor or "")
+        end
+        wait(2)
+    until false
+end
+
+-- Visit a new place when exactly 2 players remain
+task.spawn(function()
+    while true do
+        if #Players:GetPlayers() == 2 then
+            print("Two friends remaining, visiting a new place...")
+            VisitNewPlace()
+        end
+        wait(1)
+    end
+end)
