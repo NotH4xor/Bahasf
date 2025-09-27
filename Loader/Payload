@@ -1,7 +1,132 @@
--- Payload: KillSystem (this file is what's reinjected after teleport)
--- NOTE: This file should be saved as plain Lua at the raw URL used by the loader.
+-- =====================================================
+-- ✅ KillSystem with canonical PAYLOAD_URL, qot (%q) + writefile/autoexec fallback
+-- =====================================================
 
--- One-time guard (per JobId)
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- simple resolver helper
+local function pick(fn) return (type(fn) == "function") and fn or nil end
+
+-- resolve queue_on_teleport exactly (syn/fluxus aliases included)
+local qot = pick(rawget(getfenv(), "queue_on_teleport"))
+    or pick(rawget(getfenv(), "queueteleport"))
+    or (syn and pick(syn.queue_on_teleport))
+    or (fluxus and pick(fluxus.queue_on_teleport))
+
+-- disk APIs (if available)
+local writefile = pick(writefile)
+local readfile  = pick(readfile)
+local isfile    = pick(isfile)
+
+-- canonical raw URL (use plain raw.githubusercontent.com form)
+local PAYLOAD_URL   = "https://raw.githubusercontent.com/NotH4xor/Bahasf/main/Loader/Payload"
+local PAYLOAD_PATH  = "KillSystem_Payload.lua"
+local AUTOEXEC_PATH = "autoexec/KillSystem_AutoExec.lua"
+
+-- =====================================================
+-- Installer that caches payload & drops tiny autoexec bootstrap (runs once if needed)
+-- =====================================================
+local function installAutoexec()
+    if not (writefile and readfile) then
+        warn("[Installer] writefile/readfile not available -> cannot install autoexec fallback")
+        return
+    end
+
+    -- fetch payload and save to disk
+    local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
+    if ok and res then
+        pcall(writefile, PAYLOAD_PATH, res)
+        print("[Installer] Cached KillSystem payload to disk:", PAYLOAD_PATH)
+    else
+        warn("[Installer] Failed to fetch payload:", res)
+    end
+
+    -- tiny bootstrapper that autoexec will run on next join
+    local bootstrap = ([[ 
+-- KillSystem auto-bootstrap (dropped by installer)
+if isfile(%q) and readfile then
+    local s, e = pcall(loadstring, readfile(%q))
+    if s then
+        pcall(e)
+        print("[BOOTSTRAP] KillSystem reinjected from autoexec.")
+    else
+        warn("[BOOTSTRAP] Failed to load payload:", e)
+    end
+end
+]]):format(PAYLOAD_PATH, PAYLOAD_PATH)
+
+    -- write the bootstrap into autoexec folder
+    local ok2, err2 = pcall(writefile, AUTOEXEC_PATH, bootstrap)
+    if ok2 then
+        print("[Installer] Autoexec bootstrap written to:", AUTOEXEC_PATH)
+    else
+        warn("[Installer] Failed to write autoexec bootstrap:", err2)
+    end
+end
+
+-- =====================================================
+-- Queue helpers: prefer queuing a readfile-loaded payload if cached, else queue URL
+-- =====================================================
+local function ensurePayloadCached()
+    if writefile and readfile and (not isfile or not isfile(PAYLOAD_PATH)) then
+        local ok, res = pcall(game.HttpGet, game, PAYLOAD_URL)
+        if ok and res then
+            pcall(writefile, PAYLOAD_PATH, res)
+            print("[QOT] Cached payload to disk:", PAYLOAD_PATH)
+        else
+            warn("[QOT] Could not fetch payload for caching:", res)
+        end
+    end
+end
+
+local function queuePayload(reason)
+    reason = reason or ""
+    if qot then
+        if readfile and isfile and isfile(PAYLOAD_PATH) then
+            print(("[QOT] Queued payload (disk) — %s"):format(reason))
+            -- queue a payload that will read from disk on next server
+            pcall(qot, ("loadstring(readfile(%q))()"):format(PAYLOAD_PATH))
+        else
+            print(("[QOT] Queued payload (URL) — %s"):format(reason))
+            -- queue a payload that will fetch the remote URL on next server
+            pcall(qot, ("loadstring(game:HttpGet(%q))()"):format(PAYLOAD_URL))
+        end
+    else
+        print("[QOT] queue_on_teleport not supported — installing autoexec fallback")
+        installAutoexec()
+    end
+end
+
+-- Prime cache + pre-queue
+ensurePayloadCached()
+queuePayload("startup")
+
+-- Backup hooks
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+TeleportService.TeleportInitFailed:Connect(function()
+    ensurePayloadCached()
+    queuePayload("TeleportInitFailed")
+end)
+
+Players.LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.Started then
+        ensurePayloadCached()
+        queuePayload("OnTeleport.Started")
+    elseif state == Enum.TeleportState.InProgress then
+        ensurePayloadCached()
+        queuePayload("OnTeleport.InProgress")
+    end
+end)
+
+print("✅ Persistence system armed (qot + autoexec fallback)")
+
+-- =====================================================
+-- Kill System (unchanged core)
+-- =====================================================
+
+-- one-time guard per JobId
 if _G.KillSystemActive and _G.KillSystemActiveJobId == game.JobId then
     warn("🚫 Kill system already active in this server")
     return
@@ -9,20 +134,16 @@ end
 _G.KillSystemActive = true
 _G.KillSystemActiveJobId = game.JobId
 
-if not game:IsLoaded() then game.Loaded:Wait() end
-
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
+local HttpService       = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local TeleportService = game:GetService("TeleportService")
+local Workspace         = game:GetService("Workspace")
 
-local LPlayer = Players.LocalPlayer
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local LPlayer    = Players.LocalPlayer
+local Remotes    = ReplicatedStorage:WaitForChild("Remotes")
 local StampAsset = Remotes:WaitForChild("StampAsset")
 local LPlate
 
--- Find local plate
+--// Find local plate
 do
     local Plates = Workspace:FindFirstChild("Plates") or Workspace:WaitForChild("Plates", 2)
     if Plates then
@@ -37,6 +158,7 @@ do
     end
 end
 
+--// KillModule
 local KillModule = {}
 
 local function resolveTarget(target)
@@ -95,7 +217,7 @@ function KillModule.AttachAll(interval)
     end)
 end
 
--- Auto monitor respawns
+--// Auto monitor respawns
 local function monitorPlayer(player)
     if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
         player.CharacterAdded:Connect(function(character)
@@ -112,7 +234,7 @@ end
 
 KillModule.AttachAll(0.1)
 
--- Camera crash guard
+-- ✅ Camera crash guard
 local function safeCameraFix()
     local cam = Workspace.CurrentCamera
     if cam and typeof(cam.CameraType) == "EnumItem" then
@@ -125,4 +247,50 @@ Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     safeCameraFix()
 end)
 
-print("[PAYLOAD] Reinjected successfully")
+print("✅ Kill system started (with camera crash guard)")
+
+-- =====================================================
+-- ServerHop (pre-queue and teleport)
+-- =====================================================
+local order = "Desc"
+local TeleportService = game:GetService("TeleportService")
+
+local function ServerHop()
+    local url = string.format(
+        "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
+        game.PlaceId, order
+    )
+    while true do
+        local success, result = pcall(game.HttpGet, game, url)
+        if success then
+            local decoded = HttpService:JSONDecode(result)
+            local servers = decoded.data
+            local chosen
+            for _, v in ipairs(servers) do
+                if v.maxPlayers > v.playing and v.id ~= game.JobId then
+                    chosen = v
+                    break
+                end
+            end
+            if chosen then
+                ensurePayloadCached()
+                queuePayload("ServerHop pre-hop")
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen.id)
+                return
+            end
+            url = string.format(
+                "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s",
+                game.PlaceId, order, decoded.nextPageCursor or ""
+            )
+        end
+        task.wait(2)
+    end
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        if #Players:GetPlayers() == 2 then
+            ServerHop()
+        end
+    end
+end)
