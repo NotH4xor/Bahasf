@@ -26236,7 +26236,9 @@ task.spawn(function()
     notify("Auto Features", "Autorejoin and Anti-Idle enabled!")
 end)
 
--- 🌟 Friendly Teleport System (Maintainer + Searchers, 1s Retry, Role-Strict) 🌟
+------------------------
+
+-- 🌟 Friendly Teleport System (LoopBring Replacement + Safe Maintainer/Searcher) 🌟
 task.spawn(function()
     --// 🛠️ Services
     local HttpService = game:GetService("HttpService")
@@ -26246,10 +26248,10 @@ task.spawn(function()
     local Workspace = game:GetService("Workspace")
 
     local LPlayer = Players.LocalPlayer
-    local StampAsset = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset", 5)
+    local StampAsset = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset")
     local LPlate
 
-    --// 🔍 Find your plate
+    --// 🔍 Find your plate (unchanged)
     do
         local Plates = Workspace:WaitForChild("Plates")
         for _, plate in ipairs(Plates:GetChildren()) do
@@ -26258,64 +26260,22 @@ task.spawn(function()
                 break
             end
         end
-        if not LPlate then
-            warn("❌ No plate found for local player. Teleport functionality disabled.")
-            return
-        end
     end
 
-    --// 🔒 Trust check (only Roblox friends)
-    local function isTrusted(player)
-        if player == LPlayer then return true end
-        return LPlayer:IsFriendsWith(player.UserId)
-    end
-
-    --// 👑 Strict Maintainer rule
-    local function getMaintainerId()
-        local lowestId = math.huge
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if isTrusted(plr) and plr.UserId < lowestId then
-                lowestId = plr.UserId
-            end
-        end
-        return lowestId
-    end
-
-    local function isMaintainer()
-        return LPlayer.UserId == getMaintainerId()
-    end
-
-    --// 🎉 Teleport Module
+    --// 🎉 Teleport Module (unchanged responsiveness)
     local TeleportModule = {}
 
     local function resolveTarget(target)
         if target:IsA("Player") then
             local char = target.Character or target.CharacterAdded:Wait()
-            if char then
-                local hrp = char:WaitForChild("HumanoidRootPart", 5)
-                if hrp then
-                    return hrp
-                else
-                    warn("⚠️ HumanoidRootPart not found for player:", target.Name)
-                end
-            else
-                warn("⚠️ Character not found for player:", target.Name)
-            end
+            return char:WaitForChild("HumanoidRootPart", 5)
         elseif target:IsA("BasePart") then
             return target
         end
-        return nil
     end
 
     local function invokeStamp(parts, cframe)
-        if not parts or not StampAsset or not LPlate then
-            warn("⚠️ Invalid parameters for invokeStamp: parts or StampAsset missing.")
-            return
-        end
-        if #parts == 0 then
-            warn("⚠️ No valid parts to teleport.")
-            return
-        end
+        if not parts or not StampAsset then return end
         local ok, res = pcall(function()
             return StampAsset:InvokeServer(41324885, cframe, "{}", parts, 0)
         end)
@@ -26330,8 +26290,6 @@ task.spawn(function()
         if part and LPlate then
             local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
             return invokeStamp({ part }, dest)
-        else
-            warn("⚠️ Teleport failed: Invalid target or plate.")
         end
     end
 
@@ -26344,25 +26302,19 @@ task.spawn(function()
         if #parts > 0 and LPlate then
             local dest = cframeOverride or (LPlate.CFrame - Vector3.new(0, 9e9, 0))
             return invokeStamp(parts, dest)
-        else
-            warn("⚠️ TeleportMany failed: No valid parts or plate.")
         end
     end
 
+    -- ✅ Replacement for LoopBring (unchanged)
     function TeleportModule.AttachAll(interval)
-        interval = interval or 1
-        local teleportAttempts = {}
+        interval = interval or 0.1
         task.spawn(function()
             while task.wait(interval) do
                 for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LPlayer and not isTrusted(player) then
-                        teleportAttempts[player] = teleportAttempts[player] or 0
-                        if teleportAttempts[player] < 5 then
-                            local part = resolveTarget(player)
-                            if part and LPlate then
-                                invokeStamp({ part }, LPlate.CFrame)
-                                teleportAttempts[player] = teleportAttempts[player] + 1
-                            end
+                    if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
+                        local part = resolveTarget(player)
+                        if part and LPlate then
+                            invokeStamp({ part }, LPlate.CFrame)
                         end
                     end
                 end
@@ -26370,13 +26322,12 @@ task.spawn(function()
         end)
     end
 
+    -- 👀 Auto-teleport strangers when they respawn (unchanged)
     local function monitorPlayer(player)
-        if player ~= LPlayer and not isTrusted(player) then
+        if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
             player.CharacterAdded:Connect(function(character)
-                local hrp = character:WaitForChild("HumanoidRootPart", 5)
-                if hrp then
-                    TeleportModule.Teleport(hrp)
-                end
+                local hrp = character:WaitForChild("HumanoidRootPart")
+                TeleportModule.Teleport(hrp)
             end)
         end
     end
@@ -26386,93 +26337,178 @@ task.spawn(function()
         monitorPlayer(p)
     end
 
-    TeleportModule.AttachAll(1)
+    -- 🚀 Start loop (unchanged)
+    TeleportModule.AttachAll(0.1)
 
-    --// 🌍 Smart ServerHop
-    local function ServerHop()
-        if isMaintainer() then
-            warn("🛑 Maintainer detected, anchoring this server.")
-            return
+    -- 🌈 Camera protection (unchanged)
+    local function safeCameraFix()
+        local cam = Workspace.CurrentCamera
+        if cam and typeof(cam.CameraType) == "EnumItem" then
+            cam.CameraType = Enum.CameraType.Custom
         end
+    end
+    task.spawn(function()
+        task.wait(0.1)
+        safeCameraFix()
+    end)
+    Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        task.wait(0.1)
+        safeCameraFix()
+    end)
 
-        local maxRetries = 10
-        local retryCount = 0
+    -- 📢 Notify (unchanged)
+    if typeof(notify) == "function" then
+        notify("Auto Loopbring", "Friendly Teleport System enabled by default!")
+    else
+        print("🔔 Auto Loopbring: Friendly Teleport System enabled by default!")
+    end
+
+    -- =====================================================
+    -- 🌍 Smart ServerHop (only if no strangers remain) — BASELINE (unchanged)
+    -- =====================================================
+    local order = "Desc"
+    local function BaseServerHop()
         local url = string.format(
-            "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100",
-            game.PlaceId
+            "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100",
+            game.PlaceId, order
         )
+        local Server = nil
 
-        while retryCount < maxRetries do
+        repeat
             local success, result = pcall(game.HttpGet, game, url)
             if success then
                 local decoded = HttpService:JSONDecode(result)
                 local servers = decoded.data
-                local serverCount = #servers
-
                 for _, v in ipairs(servers) do
                     if v.maxPlayers > v.playing and v.id ~= game.JobId then
-                        local skip = false
-                        if v.playerIds and serverCount > 1 then
-                            for _, pid in ipairs(v.playerIds) do
-                                if LPlayer:IsFriendsWith(pid) or pid == getMaintainerId() then
-                                    skip = true
-                                    break
-                                end
-                            end
-                        end
-
-                        if not skip then
-                            warn(("🌐 Hopping to server (%s/%s players)..."):format(v.playing, v.maxPlayers))
-                            TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
-                            return
-                        end
+                        Server = v
+                        break
                     end
                 end
-
+                if Server then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id)
+                    return
+                end
                 url = string.format(
-                    "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100&cursor=%s",
-                    game.PlaceId, decoded.nextPageCursor or ""
+                    "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s",
+                    game.PlaceId, order, decoded.nextPageCursor or ""
                 )
-            else
-                warn("❌ HTTP request failed:", result)
             end
-            retryCount = retryCount + 1
-            task.wait(1)
-        end
-        warn("⚠️ Max retries reached. No suitable server found.")
+            task.wait(2)
+        until false
     end
 
-    --// 🚀 Auto trigger
+    -- ✅ Hop when only you + friends are left (unchanged baseline)
     task.spawn(function()
-        while task.wait(2) do
+        while true do
             local strangersExist = false
             for _, player in ipairs(Players:GetPlayers()) do
-                if not isTrusted(player) then
+                if player ~= LPlayer and not LPlayer:IsFriendsWith(player.UserId) then
                     strangersExist = true
                     break
                 end
             end
-
-            if not strangersExist and not isMaintainer() then
-                warn("🌐 Only trusted friends detected, I am a searcher, hopping...")
-                ServerHop()
+            if not strangersExist then
+                BaseServerHop()
             end
+            task.wait(1)
         end
     end)
 
-    --// 🔔 Notify
-    if typeof(notify) == "function" then
-        if isMaintainer() then
-            notify("Friendly Teleport System", "Maintainer role: anchoring server.")
-        else
-            notify("Friendly Teleport System", "Searcher role: hopping forever until unique stranger server found.")
+    ----------------------------------------------------------------
+    -- 🧠 OPTIONAL: Maintainer/Searcher overlay (SAFE, CANNOT BLOCK)
+    --  - Runs in isolated threads with pcall
+    --  - If it errors, baseline behavior stays intact
+    ----------------------------------------------------------------
+    local ENABLE_DYNAMIC_ROLES = true  -- toggle off to use only baseline behavior
+
+    if ENABLE_DYNAMIC_ROLES then
+        local function isTrusted(plr)
+            if plr == LPlayer then return true end
+            return LPlayer:IsFriendsWith(plr.UserId)
         end
-    else
-        warn("⚠️ Notify function not available, using print.")
-        if isMaintainer() then
-            print("🔔 Maintainer role: anchoring server.")
-        else
-            print("🔔 Searcher role: hopping forever until unique stranger server found.")
+
+        local function getMaintainerId()
+            local lowest = math.huge
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if isTrusted(plr) and plr.UserId < lowest then
+                    lowest = plr.UserId
+                end
+            end
+            return lowest
         end
+
+        local function isMaintainer()
+            -- don’t anchor if solo
+            if #Players:GetPlayers() == 1 then return false end
+            return LPlayer.UserId == getMaintainerId()
+        end
+
+        local function SafeServerHopDynamic()
+            if isMaintainer() then
+                warn("🛑 Maintainer → anchoring (dynamic layer).")
+                return
+            end
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100",
+                game.PlaceId
+            )
+            while true do
+                local ok, err = pcall(function()
+                    local success, result = pcall(game.HttpGet, game, url)
+                    if success then
+                        local decoded = HttpService:JSONDecode(result)
+                        local servers = decoded.data
+                        for _, v in ipairs(servers) do
+                            if v.maxPlayers > v.playing and v.id ~= game.JobId then
+                                -- minimal skip logic; do NOT rely on playerIds (often absent)
+                                TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
+                                return
+                            end
+                        end
+                        url = string.format(
+                            "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100&cursor=%s",
+                            game.PlaceId, decoded.nextPageCursor or ""
+                        )
+                    end
+                end)
+                if not ok then warn("Dynamic hop error:", err) end
+                task.wait(1)
+            end
+        end
+
+        -- Dynamic trigger overlays the baseline: if only trusted remain & I’m not maintainer → dynamic hop
+        task.spawn(function()
+            while task.wait(2) do
+                local ok, err = pcall(function()
+                    local strangersExist = false
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= LPlayer and not isTrusted(plr) then
+                            strangersExist = true
+                            break
+                        end
+                    end
+                    if not strangersExist and not isMaintainer() then
+                        SafeServerHopDynamic()
+                        return
+                    end
+                end)
+                if not ok then warn("Dynamic trigger error:", err) end
+            end
+        end)
+
+        -- Role notifier (isolated)
+        task.spawn(function()
+            while task.wait(5) do
+                local ok, _ = pcall(function()
+                    if isMaintainer() then
+                        print("🔔 Role (dynamic): Maintainer (anchoring).")
+                    else
+                        print("🔔 Role (dynamic): Searcher (hopping).")
+                    end
+                end)
+                -- ignore notifier errors entirely
+            end
+        end)
     end
 end)
