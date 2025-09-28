@@ -13116,12 +13116,9 @@ task.spawn(function()
     
     notify("Auto Features", "Autorejoin and Anti-Idle enabled!")
 end)
---------------=====================--------------------------
+
 -- 🌟 Friendly Teleport System (LoopBring Replacement) 🌟
 task.spawn(function()
-    -- small delay so game/character loads
-    task.wait(5)
-
     --// 🛠️ Services
     local HttpService = game:GetService("HttpService")
     local TeleportService = game:GetService("TeleportService")
